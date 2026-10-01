@@ -5,6 +5,8 @@ cansaço e sono, fala (com bastante humor) e, se for muito cutucado, explode. De
 
 Funciona no **Windows** e no **Linux** (GNOME incluído).
 
+![Creeper Companion: painel de status, comendo bolo, dançando, chiando antes de explodir e dormindo](docs/creeper-companion.png)
+
 ## Como abrir
 
 - **Windows:** dois cliques em `iniciar_windows.bat`. Na primeira vez ele cria o ambiente e instala as dependências.
@@ -100,6 +102,7 @@ creeper/
 content/                itens e falas (YAML)
 tools/smoke_test.py     teste automático sem tela (python tools/smoke_test.py)
 tools/preview_sprites.py  gera uma folha com todas as expressões e ícones
+tools/readme_image.py   gera a imagem do README (docs/creeper-companion.png)
 ```
 
 ## Licença
