@@ -1,0 +1,102 @@
+# Itens que dá pra oferecer ao creeper.
+#
+# "efeitos" são somados às necessidades (escala 0-100, onde 100 = totalmente satisfeito):
+#   fome     -> saciedade (positivo = mata a fome)
+#   sede     -> hidratação
+#   energia  -> disposição física (negativo = cansa)
+#   sono     -> descanso (positivo = tira o sono)
+#   diversao -> diversão
+#
+# "status" aplica um efeito temporário: dourado, enjoado, cafeinado, velocidade.
+# "cura: true" remove os efeitos ruins (enjoado, cafeinado).
+# "duracao" (atividades) é em segundos.
+
+comidas:
+  - id: maca
+    nome: Maçã
+    efeitos: {fome: 18, diversao: 2}
+  - id: pao
+    nome: Pão
+    efeitos: {fome: 25}
+  - id: cenoura
+    nome: Cenoura
+    efeitos: {fome: 15, diversao: 3}
+  - id: batata
+    nome: Batata assada
+    efeitos: {fome: 22, diversao: 3}
+  - id: frango
+    nome: Frango assado
+    efeitos: {fome: 32, energia: 3}
+  - id: bife
+    nome: Bife
+    efeitos: {fome: 40, energia: 5}
+  - id: ensopado
+    nome: Ensopado de cogumelo
+    efeitos: {fome: 30, sede: 8}
+  - id: cookie
+    nome: Cookie
+    efeitos: {fome: 8, diversao: 12}
+  - id: torta
+    nome: Torta de abóbora
+    efeitos: {fome: 28, diversao: 10}
+  - id: bolo
+    nome: Bolo
+    efeitos: {fome: 20, diversao: 25, energia: 5}
+  - id: maca_dourada
+    nome: Maçã dourada
+    efeitos: {fome: 30, energia: 30, diversao: 15, sono: 10}
+    status: dourado
+  - id: carne_podre
+    nome: Carne podre
+    efeitos: {fome: 15, diversao: -15}
+    status: enjoado
+
+bebidas:
+  - id: agua
+    nome: Água
+    efeitos: {sede: 35}
+  - id: suco
+    nome: Suco de melancia
+    efeitos: {sede: 28, diversao: 5}
+  - id: leite
+    nome: Leite
+    efeitos: {sede: 25, fome: 5}
+    cura: true
+  - id: cafe
+    nome: Café
+    efeitos: {sede: 10, sono: 25, energia: 10}
+    status: cafeinado
+  - id: pocao_velocidade
+    nome: Poção de velocidade
+    efeitos: {sede: 15, energia: 15}
+    status: velocidade
+
+atividades:
+  - id: caminhar
+    nome: Caminhar
+    duracao: 25
+    efeitos: {energia: -8, fome: -3, sede: -5, diversao: 8}
+  - id: correr
+    nome: Correr
+    duracao: 14
+    efeitos: {energia: -16, fome: -6, sede: -10, diversao: 12}
+  - id: pular
+    nome: Pular
+    duracao: 8
+    efeitos: {energia: -8, fome: -3, sede: -4, diversao: 10}
+  - id: flexao
+    nome: Flexões
+    duracao: 7
+    efeitos: {energia: -4, diversao: 15}
+  - id: dancar
+    nome: Dançar
+    duracao: 12
+    efeitos: {energia: -6, sede: -3, diversao: 20}
+  - id: descansar
+    nome: Sentar e descansar
+    duracao: 60
+    efeitos: {energia: 20}
+  - id: gato
+    nome: Trazer um gato
+    duracao: 25
+    efeitos: {diversao: -5, energia: -10}

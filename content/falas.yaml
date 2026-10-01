@@ -1,0 +1,319 @@
+# Falas do creeper, agrupadas por situação.
+# Variáveis disponíveis: {nome} (nome do creeper), {tempo} (tempo que você ficou fora).
+# Pode adicionar quantas quiser: ele sorteia evitando repetir as últimas.
+
+primeira_vez:
+  - "Oi! Eu sou o {nome}. Passa o mouse em mim pra ver do que eu preciso. E, por favor, não me cutuca demais."
+
+sem_bandeja:
+  - "Não achei a bandeja do sistema... vou ficar por aqui mesmo."
+
+saudacao_manha:
+  - "Bom dia! Ou, como dizemos no meu bioma: tssss... brincadeira. Bom dia!"
+  - "Bom dia, humano. Fiquei vigiando sua área de trabalho a noite toda. Nada explodiu. Ainda."
+  - "Acordei! Cadê o café da manhã? Aceito qualquer coisa que não seja um gato."
+saudacao_tarde:
+  - "Boa tarde! Prometo não explodir nenhum arquivo importante hoje."
+  - "Opa, boa tarde! Senti sua falta. Mentira, eu tava andando em cima da barra de tarefas."
+  - "Boa tarde! Já almoçou? Eu não. Só pra constar."
+saudacao_noite:
+  - "Boa noite! Hora de trabalhar ou hora de fingir que trabalha?"
+  - "Boa noite! A noite é quando a gente spawna. Por isso eu tô animado."
+saudacao_madrugada:
+  - "Madrugada? Sério? Até os zumbis já foram dormir."
+  - "Você sabe que horas são? Eu sei. Sou um creeper e até eu acho tarde."
+
+voltou_longe:
+  - "Você sumiu por {tempo}! Achei que tinham te explodido."
+  - "{tempo} sem me ver?! Fiquei aqui no escuro... pensando em gatos."
+  - "Olha quem voltou depois de {tempo}. Tava minerando diamante, é?"
+voltou_curto:
+  - "Ah, voltou! Eu nem percebi que você tinha saído. (Percebi sim.)"
+  - "De volta! Não mexi em nada. Quase nada."
+
+idle:
+  - "Sabia que eu não tenho braços? Pois é. Abraço, só virtual."
+  - "Fato curioso: eu era pra ser um porco. Erro de modelagem. Pode pesquisar."
+  - "Não sou verde de inveja. Sou verde de nascença."
+  - "Tssss... ah, desculpa. Foi só um soluço."
+  - "Prometo que não vou explodir. Hoje. Provavelmente."
+  - "Por que todo mundo foge de mim? Eu só queria um abraço."
+  - "Minha comida favorita? Pólvora. Mas não conta pro seu antivírus."
+  - "Se essa barra de tarefas cair, a culpa não foi minha."
+  - "Tô de boa. Só existindo. Verdemente."
+  - "O Steve nunca me ligou de volta."
+  - "Bora minerar alguma coisa? Ah é, você tá trabalhando. Finge que eu não falei nada."
+  - "Eu e o Enderman temos algo em comum: ninguém olha pra gente direito."
+  - "Se você ouvir um 'tssss', foi o vento. Provavelmente."
+  - "Aw man."
+  - "Já salvou seu trabalho? Pergunto por motivos... explosivos."
+  - "Ctrl+S. Confia em mim."
+  - "Às vezes a gente só precisa de um bloco de terra e um pouco de paz."
+  - "Esse cursor aí... eu tô de olho nele."
+  - "Eu ando pra lá, ando pra cá. É a minha academia."
+  - "Se eu fosse um arquivo, eu seria um .exe-plosivo."
+idle_noite:
+  - "Tá ficando tarde... e eu tô ficando com sono. Coincidência? Acho que não."
+  - "À noite os mobs saem. Inclusive eu. Mas eu já tava aqui."
+  - "Que silêncio... dá até pra ouvir o ventilador do seu PC."
+idle_manha:
+  - "Manhã é a melhor hora: os zumbis tão pegando fogo e eu tô de boa."
+  - "Que dia bonito pra não explodir nada."
+
+poke:
+  - "Ei!"
+  - "Que foi?"
+  - "Isso faz cócegas."
+  - "Cutucar creeper é esporte radical, sabia?"
+  - "Sim, eu sou real. Pode parar de testar."
+  - "Opa! Tô acordado, tô acordado!"
+  - "Presente!"
+poke_irritado:
+  - "Para de me cutucar."
+  - "Sério. Para."
+  - "Tô contando os cutucões. E não tá acabando bem."
+  - "Você não aprende, né?"
+poke_aviso:
+  - "Último aviso... tsss..."
+  - "Tô ficando... quentinho... por dentro..."
+  - "Sabe o que acontece quando cutuca um creeper? Pergunta pro Steve."
+
+carinho:
+  - "Hehe. Isso é bom."
+  - "Ninguém nunca fez carinho num creeper. Tô emocionado."
+  - "Continua... não, sério, continua."
+  - "Meu pavio tá ficando mais comprido. Isso é ótimo."
+  - "Isso não é chiado, é ronronar de creeper."
+carinho_acalmou:
+  - "Ufa... essa foi por pouco. Obrigado."
+  - "Tá, tá... respira... tô calmo. Quase explodi de raiva. Literalmente."
+
+sibilar:
+  - "Tssssssssss..."
+  - "TSSSSSSSS..."
+explodiu:
+  - "...aw man."
+  - "Explodi. Feliz agora?"
+  - "Eu voltei. Mas não voltei feliz."
+  - "Não tô falando com você."
+emburrado:
+  - "Hmpf."
+  - "Não tô falando com você."
+  - "Tô ocupado sendo ofendido."
+  - "..."
+  - "Pode me dar comida. Mas não vou te perdoar. Só vou comer."
+emburrado_comer:
+  - "Vou comer, mas só porque tô com fome. Continuo bravo."
+  - "Isso não muda nada. *nhac*"
+  - "Hmpf. Tá bom. Mas só esse."
+desemburrou:
+  - "Tá bom, tá bom. Tô de bem com você. Mas não me cutuca mais."
+  - "Ok, te perdoo. Memória de creeper é curta, mas existe."
+
+fome:
+  - "Tô com uma fominha..."
+  - "Minha barriga roncou. Ou foi uma TNT? Melhor me dar comida pra garantir."
+  - "Sabe o que combina com produtividade? Um lanchinho. Pra mim."
+fome_critica:
+  - "FOME. Eu como até o seu mouse."
+  - "Tô olhando pra blocos de terra e vendo bolo."
+  - "Se eu desmaiar de fome, a culpa é sua. Deixei registrado."
+sede:
+  - "Tô com sede. Um copo d'água, por favor?"
+  - "Minha boca tá mais seca que deserto."
+  - "Água, por favor. Um balde, de preferência."
+sede_critica:
+  - "ÁGUA. Tô virando areia."
+  - "Tô tão seco que daqui a pouco viro pólvora pura."
+cansado:
+  - "Tô cansado... acho que vou sentar um pouco."
+  - "Minhas perninhas tão pedindo arrego."
+cansado_critico:
+  - "Exausto. Não consigo nem chiar direito."
+sono:
+  - "*bocejo* ...que horas são?"
+  - "Tô com sono. Me põe pra dormir?"
+  - "Meus olhos tão fechando sozinhos."
+sono_critico:
+  - "Vou... dormir... aqui... mesmo..."
+tedio:
+  - "Tô entediado. Bora fazer alguma coisa?"
+  - "Que tédio. Até o Enderman é mais animado."
+  - "Tédio em creeper causa explosões espontâneas. Brincadeira. Ou não."
+tedio_critico:
+  - "TÉDIO EXTREMO. Me leva pra passear, dança comigo, qualquer coisa!"
+
+comer:
+  - "Nhac nhac nhac."
+  - "Hmm! Delícia."
+  - "Obrigado! Você é o melhor humano desta área de trabalho."
+comer_maca:
+  - "Uma maçã por dia mantém o Steve longe."
+  - "Crocante!"
+comer_pao:
+  - "Pão! Clássico. Simples. Igual a mim, só que menos explosivo."
+comer_cenoura:
+  - "Cenoura! Agora eu enxergo no escuro. Mais ou menos."
+comer_batata:
+  - "Batata assada! O alimento oficial de quem não quer cozinhar."
+comer_frango:
+  - "Frango assado! E nem precisei correr atrás da galinha."
+comer_bife:
+  - "BIFE! Hoje é dia de festa!"
+  - "Isso sim é comida de verdade."
+comer_ensopado:
+  - "Ensopado de cogumelo. Quentinho e gosmento. Perfeito."
+comer_cookie:
+  - "Cookie! Você me conhece tão bem."
+  - "Um cookie? Pra mim? Tô até sem chiar."
+comer_torta:
+  - "Torta de abóbora! Tem gosto de outono e de Enderman frustrado."
+comer_bolo:
+  - "BOLO! É meu aniversário?!"
+  - "O bolo não era uma mentira! (Referência certa, jogo errado.)"
+comer_maca_dourada:
+  - "MAÇÃ DOURADA?! Tô brilhando! Literalmente!"
+  - "Me sinto invencível. Me cutuca agora. Não, pera, não cutuca."
+comer_carne_podre:
+  - "...isso tava no chão?"
+  - "Tem gosto de zumbi. Não pergunta como eu sei."
+comer_cheio:
+  - "Tô cheio. Se eu comer mais, eu explodo. E não do jeito divertido."
+  - "Não cabe mais nada. Nem um pixel."
+
+beber:
+  - "Glub glub glub."
+  - "Ahh, refrescante."
+beber_agua:
+  - "Água fresquinha! Bebe você também, hein?"
+  - "Hidratação é tudo."
+beber_suco:
+  - "Suco de melancia! Tem gosto de verão."
+beber_leite:
+  - "Leite! Cura tudo, segundo a ciência do Minecraft."
+beber_cafe:
+  - "CAFÉ! Agora eu consigo ouvir as cores!"
+  - "Café... *tremendo* ...tô ótimo. ÓTIMO."
+beber_pocao_velocidade:
+  - "Poção de velocidade! Segura essa!"
+  - "VRUUUUUM!"
+beber_cheio:
+  - "Se eu beber mais, vou precisar de um balde. Pra outra coisa."
+
+atividade_cansado:
+  - "Exercício? Mal consigo ficar em pé."
+  - "Hoje não, tô sem bateria."
+inicio_caminhar:
+  - "Bora dar uma volta!"
+  - "Passeio! Vou conhecer o outro canto da tela."
+fim_caminhar:
+  - "Uma caminhada faz bem."
+  - "Conheci um ícone novo no caminho."
+inicio_correr:
+  - "Corre, Forrest! Digo, Creeper!"
+  - "Modo turbo ativado!"
+fim_correr:
+  - "*ofegante* ...isso... foi... ótimo."
+  - "Bati meu recorde! Que eu nunca medi."
+inicio_pular:
+  - "Pula, pula, pula!"
+fim_pular:
+  - "Eu devia ter nascido slime."
+  - "Ufa! A gravidade venceu de novo."
+inicio_flexao:
+  - "Flexão? Tá bom, vou tentar..."
+fim_flexao:
+  - "...eu não tenho braços. Por que você me pediu isso?"
+  - "Tecnicamente isso foi um agachamento. Conta?"
+  - "Fiz zero flexões. Recorde pessoal!"
+inicio_dancar:
+  - "Solta o som!"
+  - "Olha esse passinho!"
+fim_dancar:
+  - "Fui eu ou o chão tremeu? Fui eu."
+  - "Danço melhor que o Steve. Não é difícil."
+inicio_descansar:
+  - "Vou sentar um pouquinho."
+fim_descansar:
+  - "Pronto, recarregado."
+inicio_gato:
+  - "UM GATO?!?! AAAAAAAAAAAH!"
+  - "GATO! GATO! SAI DE PERTO!"
+fim_gato:
+  - "Ele já foi? ...Eu não tava com medo. Tava fazendo cardio."
+  - "Ninguém viu nada. Eu sempre corro assim."
+
+dormir:
+  - "Boa noite... zzz"
+  - "Vou tirar um cochilo. Se ouvir 'tsss', é ronco."
+dormir_sem_sono:
+  - "Dormir agora? Tô ligadão!"
+  - "Nem tô com sono. Me pergunta de novo mais tarde."
+dormir_cafe:
+  - "Dormir? Tomei café, tô enxergando o futuro."
+sonho:
+  - "...não, gato não..."
+  - "...mais cinco minutinhos..."
+  - "...bolo... bolo de pólvora..."
+  - "...Steve... me liga..."
+  - "zzz... tsss... zzz"
+acordar_natural:
+  - "Bom diaaa! Dormi que nem pedra. Pedregulho, na verdade."
+  - "Acordei renovado! Pronto pra não explodir."
+acordar_forcado:
+  - "Ei! Eu tava dormindo!"
+  - "Quem acorda creeper dormindo tá pedindo pra explodir."
+  - "Hmpf. Eu tava sonhando com bolo."
+cochilo_volta:
+  - "Ah, você voltou! Eu não tava dormindo. Tava descansando os olhos."
+  - "Hã? Quê? Tô acordado! Tava testando a gravidade das pálpebras."
+
+arrastado:
+  - "Aaaah! Me põe no chão!"
+  - "Weeeee!"
+  - "Isso é uma abdução?"
+  - "Eu tenho medo de altura! (Não tenho.)"
+chacoalhado:
+  - "Para de me chacoalhar! Tem pólvora aqui dentro!"
+  - "Tô tonto... tem três cursores..."
+solto_alto:
+  - "Ai. Ainda bem que creeper não tem dano de queda. Acho."
+  - "Que tombo! Ninguém viu, né?"
+solto:
+  - "Pousei!"
+  - "Nota 10 na aterrissagem."
+
+lembrete_agua:
+  - "Ei, humano! Bebe água. Eu bebo, você bebe."
+  - "Hora da água! Seus rins agradecem. Eu também."
+  - "Hidrata aí! Até eu, que sou feito de pólvora, bebo água."
+lembrete_pausa:
+  - "Você tá aí faz tempo. Levanta, estica as pernas!"
+  - "Pausa! Olha pra longe uns segundos. Seus olhos merecem."
+  - "Alonga esses braços. Usa por mim, que eu não tenho."
+lembrete_dormir:
+  - "Já passou da meia-noite. Vai dormir, humano!"
+  - "Sério, vai dormir. Amanhã você me agradece."
+  - "Se você não dormir, os phantoms vêm te buscar. Tô só avisando."
+
+para_bandeja:
+  - "Vou dar uma escondidinha. Me chama se precisar!"
+  - "Tô indo pra bandeja. Não esquece de mim!"
+da_bandeja:
+  - "Voltei! Sentiu saudade?"
+  - "Tô de volta! O que eu perdi?"
+
+fim_enjoado:
+  - "Ufa, passou o enjoo."
+fim_velocidade:
+  - "Tô voltando à velocidade normal... que lerdeza."
+fim_cafeinado:
+  - "O café passou... agora sim eu durmo."
+fim_dourado:
+  - "Parei de brilhar. Foi bom enquanto durou."
+leite_cura:
+  - "O leite curou tudo! Ciência!"
+
+renomeado:
+  - "{nome}? Gostei! Tem um certo... estrondo."
+  - "Pode me chamar de {nome}. Soa explosivo."

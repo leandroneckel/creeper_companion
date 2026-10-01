@@ -1,0 +1,491 @@
+"""Janela transparente do creeper: desenho, balão de fala, barra de botões,
+painel de status e interação com o mouse."""
+import time
+
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QRegion
+from PySide6.QtWidgets import QToolTip, QWidget
+
+from .. import desktop
+from ..art import icons, sprite
+from ..needs import EFFECT_LABELS, LABELS, STATS
+
+SLOT = 28
+BUTTONS = [
+    ("comer", "Comer"),
+    ("beber", "Beber"),
+    ("atividades", "Atividades"),
+    ("dormir", "Dormir"),
+    ("carinho", "Fazer carinho"),
+    ("bandeja", "Recolher para a bandeja"),
+    ("menu", "Mais opções"),
+]
+WIDTH = 270
+STATUS_W = 214
+BUBBLE_MAX_W = 236
+
+TOOLTIP_BG = QColor(18, 4, 22, 238)
+TOOLTIP_BORDER = QColor("#4B2A86")
+
+
+class PetWindow(QWidget):
+    def __init__(self, app):
+        flags = (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+                 | Qt.WindowDoesNotAcceptFocus | desktop.window_flags_extra())
+        super().__init__(None, flags)
+        self.app = app
+        self.pet = app.pet
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setMouseTracking(True)
+        self.setWindowTitle("Creeper Companion")
+
+        self.font_bubble = QFont()
+        self.font_bubble.setPixelSize(13)
+        self.font_bubble.setWeight(QFont.DemiBold)
+        self.font_small = QFont()
+        self.font_small.setPixelSize(11)
+        self.font_small.setWeight(QFont.DemiBold)
+        self.font_title = QFont()
+        self.font_title.setPixelSize(12)
+        self.font_title.setBold(True)
+
+        self.bubble_text: str | None = None
+        self.bubble_until = 0.0
+        self.hover_since: float | None = None
+        self.hover_lost: float | None = None
+        self.hover_btn: str | None = None
+        self.press: tuple[QPoint, float] | None = None
+        self.dragging = False
+        self.drag_offset = QPointF()
+        self.stroke_dir = 0
+        self.stroke_x: int | None = None
+        self.stroke_times: list[float] = []
+        self._mask_key = None
+        self._last_sig = None
+        self.resize_for_scale()
+
+    # ---- geometria -------------------------------------------------------
+    def resize_for_scale(self) -> None:
+        s = self.pet.s
+        self.sw, self.sh = 16 * s, 40 * s
+        self.H = self.sh + 290
+        self.setFixedSize(WIDTH, self.H)
+        self.sync_position()
+
+    def sync_position(self) -> None:
+        x = round(self.pet.x - WIDTH / 2)
+        y = round(self.pet.y - self.H)
+        if x != self.x() or y != self.y():
+            self.move(x, y)
+
+    def sprite_rect(self) -> QRectF:
+        pet = self.pet
+        w = self.sw * (1 + pet.swell + 0.22 * pet.squash)
+        h = self.sh * (1 + pet.swell - 0.22 * pet.squash)
+        return QRectF(WIDTH / 2 - w / 2, self.H - h - pet.jump, w, h)
+
+    def toolbar_rect(self) -> QRect:
+        w = len(BUTTONS) * SLOT + 8
+        h = SLOT + 8
+        return QRect((WIDTH - w) // 2, self.H - self.sh - 12 - h, w, h)
+
+    def button_rects(self) -> list[tuple[str, QRect]]:
+        bar = self.toolbar_rect()
+        return [(bid, QRect(bar.x() + 4 + i * SLOT, bar.y() + 4, SLOT, SLOT)) for i, (bid, _) in enumerate(BUTTONS)]
+
+    def status_height(self) -> int:
+        return 8 + 18 + 15 + len(STATS) * 15 + 6
+
+    def status_rect(self) -> QRect:
+        h = self.status_height()
+        return QRect((WIDTH - STATUS_W) // 2, self.toolbar_rect().top() - 6 - h, STATUS_W, h)
+
+    def _visible_x_range(self) -> tuple[int, int]:
+        """Parte da janela que está dentro da tela (para o balão não ser cortado)."""
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        geo = screen.geometry()
+        return max(0, geo.left() - self.x()), min(WIDTH, geo.right() + 1 - self.x())
+
+    # ---- estado de hover -------------------------------------------------
+    def toolbar_allowed(self) -> bool:
+        pet = self.pet
+        return (not self.dragging and pet.can_interact() and pet.jump == 0
+                and pet.state not in ("hiss", "fall", "exploded"))
+
+    def toolbar_visible(self) -> bool:
+        return (self.toolbar_allowed() and self.hover_since is not None
+                and time.monotonic() - self.hover_since > 0.2)
+
+    def status_visible(self) -> bool:
+        return self.toolbar_visible() and time.monotonic() - self.hover_since > 0.7
+
+    def update_hover(self) -> None:
+        local = self.mapFromGlobal(QCursor.pos())
+        now = time.monotonic()
+        zone = self.sprite_rect().toRect().adjusted(-4, -4, 4, 4)
+        if self.hover_since is not None and self.toolbar_allowed():
+            zone = zone.united(self.toolbar_rect().adjusted(-8, -8, 8, 8))
+            if self.status_visible():
+                zone = zone.united(self.status_rect().adjusted(-8, -8, 8, 8))
+        inside = zone.contains(local) and not self.pet.hidden
+        if inside:
+            self.hover_lost = None
+            if self.hover_since is None:
+                self.hover_since = now
+        elif self.hover_since is not None:
+            if self.hover_lost is None:
+                self.hover_lost = now
+            elif now - self.hover_lost > 0.6:
+                self.hover_since = None
+                self.hover_lost = None
+                self.hover_btn = None
+                QToolTip.hideText()
+
+    # ---- quadro ----------------------------------------------------------
+    def frame(self) -> None:
+        """Chamado a cada quadro pelo app."""
+        if not self.isVisible():
+            return
+        if not self.dragging:
+            self.sync_position()
+        self.update_hover()
+        if self.bubble_text and time.monotonic() > self.bubble_until:
+            self.bubble_text = None
+        if self.pet.state == "exploded":
+            self.bubble_text = None
+        if desktop.needs_input_mask():
+            self._update_mask()
+        sig = self._signature()
+        if sig is None or sig != self._last_sig:
+            self._last_sig = sig
+            self.update()
+
+    def _signature(self):
+        """Resumo de tudo que aparece na tela; se não mudou, não precisa redesenhar."""
+        pet = self.pet
+        if pet.particles:
+            return None
+        r = self.sprite_rect()
+        status = None
+        if self.status_visible():
+            n = pet.needs
+            status = (n.mood(), tuple(int(v // 5) for v in n.values.values()),
+                      tuple(n.active_effects()), self.app.settings.name)
+        return (pet.pose(), pet.hidden, pet.held, round(pet.tilt), round(r.x()), round(r.y()),
+                round(r.width()), round(r.height()), self.bubble_text, self.toolbar_visible(),
+                self.hover_btn, pet.state == "sleep", status)
+
+    def show_bubble(self, text: str, seconds: float | None = None) -> None:
+        self.bubble_text = text
+        self.bubble_until = time.monotonic() + (seconds or max(3.5, min(9.0, 2.5 + len(text) / 13)))
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        desktop.setup_window(self)
+
+    # ---- máscara de entrada (Linux/X11) ----------------------------------
+    def _update_mask(self) -> None:
+        rects = [self.sprite_rect().toRect().adjusted(-2, -2, 2, 2)]
+        if self.toolbar_visible():
+            rects.append(self.toolbar_rect())
+            if self.status_visible():
+                rects.append(self.status_rect())
+        if self.bubble_text:
+            rects.append(QRect(0, 0, WIDTH, self.toolbar_rect().top()))
+        for part in self.pet.particles:
+            # a máscara também recorta o desenho no X11, então inclui cada partícula
+            if part.kind == "boom":
+                rects.append(QRect(0, 0, WIDTH, self.H))
+                continue
+            size = 48 if part.kind in ("smoke", "z", "note", "icon") else 12
+            rects.append(QRect(int(WIDTH / 2 + part.x - size / 2), int(self.H + part.y - size), size, size + 4))
+        key = tuple((r.x(), r.y(), r.width(), r.height()) for r in rects)
+        if key == self._mask_key:
+            return
+        self._mask_key = key
+        region = QRegion()
+        for r in rects:
+            region = region.united(QRegion(r))
+        self.setMask(region)
+
+    # ---- desenho ---------------------------------------------------------
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        pet = self.pet
+        cx = WIDTH / 2
+        ground = self.H
+
+        if not pet.hidden:
+            if pet.state not in ("dragged", "fall"):
+                lift = max(0.35, 1 - pet.jump / (self.sh * 0.5))
+                sw = self.sw * 1.05 * lift
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(0, 0, 0, int(60 * lift)))
+                p.drawEllipse(QRectF(cx - sw / 2, ground - 6, sw, 6))
+            self._draw_creeper(p)
+
+        self._draw_particles(p)
+
+        top = self.H - self.sh - 10
+        if self.toolbar_visible():
+            self._draw_toolbar(p)
+            top = self.toolbar_rect().top() - 4
+            if self.status_visible():
+                rect = self.status_rect()
+                self._draw_status(p, rect)
+                top = rect.top() - 4
+        if self.bubble_text and not pet.hidden:
+            self._draw_bubble(p, top)
+        p.end()
+
+    def _draw_creeper(self, p: QPainter) -> None:
+        pet = self.pet
+        img = sprite.render(pet.pose())
+        rect = self.sprite_rect()
+        p.save()
+        if pet.tilt:
+            pivot = QPointF(rect.center().x(), rect.top() + rect.height() * 0.3)
+            p.translate(pivot)
+            p.rotate(pet.tilt)
+            p.translate(-pivot)
+        p.drawImage(rect, img)
+        if pet.held:
+            size = 8 * pet.s
+            ix = rect.center().x() - size * 0.15
+            iy = rect.top() + rect.height() * 0.28
+            p.save()
+            p.translate(ix, iy)
+            if pet.state == "drink":
+                p.rotate(-35)
+            p.drawImage(QRectF(-size / 2, -size / 2, size, size), icons.image(pet.held))
+            p.restore()
+        p.restore()
+
+    def _draw_particles(self, p: QPainter) -> None:
+        pet = self.pet
+        cx, gy = WIDTH / 2, self.H
+        p.setPen(Qt.NoPen)
+        for part in pet.particles:
+            x, y = cx + part.x, gy + part.y - (pet.jump if part.kind in ("sweat",) else 0)
+            fade = 1.0 - part.age / part.life
+            if part.kind in ("z", "note"):
+                font = QFont(self.font_title)
+                font.setPixelSize(int(part.size + part.age * 4))
+                p.setFont(font)
+                color = QColor(part.color)
+                color.setAlphaF(max(0.0, min(1.0, fade * 1.4)))
+                p.setPen(QColor(0, 0, 0, int(160 * fade)))
+                p.drawText(QPointF(x + 1, y + 1), part.text)
+                p.setPen(color)
+                p.drawText(QPointF(x, y), part.text)
+                p.setPen(Qt.NoPen)
+            elif part.kind == "heart":
+                size = 6 * pet.s
+                p.setOpacity(max(0.0, min(1.0, fade * 1.5)))
+                p.drawImage(QRectF(x - size / 2, y - size / 2, size, size), icons.image("carinho"))
+                p.setOpacity(1.0)
+            elif part.kind == "icon":
+                size = 12 * pet.s
+                p.setOpacity(max(0.0, min(1.0, fade * 3)))
+                p.drawImage(QRectF(x - size / 2, y - size, size, size), icons.image(part.text))
+                p.setOpacity(1.0)
+            elif part.kind == "smoke":
+                size = part.size * (1 + 1.5 * part.age / part.life)
+                color = QColor(part.color)
+                color.setAlpha(int(200 * fade))
+                p.fillRect(QRectF(x - size / 2, y - size / 2, size, size), color)
+            elif part.kind == "boom":
+                r = part.size * (0.35 + part.age / part.life)
+                p.setBrush(QColor(255, 255, 255, int(230 * fade)))
+                p.drawEllipse(QPointF(x, y), r, r)
+                p.setBrush(Qt.NoBrush)
+            else:  # crumb, debris, sweat, spark
+                color = QColor(part.color)
+                if part.kind in ("spark", "sweat"):
+                    color.setAlpha(int(255 * fade))
+                if part.kind == "sweat":
+                    color = QColor(100, 181, 246, int(255 * fade))
+                s = part.size
+                p.fillRect(QRectF(x - s / 2, y - s / 2, s, s), color)
+
+    def _bevel(self, p: QPainter, r: QRect, fill: QColor, light: QColor, dark: QColor) -> None:
+        p.fillRect(r, fill)
+        p.fillRect(QRect(r.left(), r.top(), r.width(), 2), light)
+        p.fillRect(QRect(r.left(), r.top(), 2, r.height()), light)
+        p.fillRect(QRect(r.left(), r.bottom() - 1, r.width(), 2), dark)
+        p.fillRect(QRect(r.right() - 1, r.top(), 2, r.height()), dark)
+
+    def _draw_toolbar(self, p: QPainter) -> None:
+        bar = self.toolbar_rect()
+        p.fillRect(bar.adjusted(-2, -2, 2, 2), QColor("#000000"))
+        self._bevel(p, bar, QColor("#C6C6C6"), QColor("#FFFFFF"), QColor("#555555"))
+        for bid, rect in self.button_rects():
+            self._bevel(p, rect.adjusted(1, 1, -1, -1), QColor("#8B8B8B"), QColor("#373737"), QColor("#FFFFFF"))
+            name = bid
+            if bid == "dormir" and self.pet.state == "sleep":
+                name = "acordar"
+            icon_rect = QRect(rect.x() + 2, rect.y() + 2, 24, 24)
+            p.drawImage(icon_rect, icons.image(name))
+            if bid == self.hover_btn:
+                p.fillRect(rect.adjusted(3, 3, -3, -3), QColor(255, 255, 255, 80))
+
+    def _draw_tooltip_box(self, p: QPainter, r: QRect) -> None:
+        p.fillRect(r.adjusted(2, 0, -2, 0), TOOLTIP_BG)
+        p.fillRect(r.adjusted(0, 2, 0, -2), TOOLTIP_BG)
+        pen_r = r.adjusted(2, 2, -2, -2)
+        p.fillRect(QRect(pen_r.left(), pen_r.top(), pen_r.width(), 2), TOOLTIP_BORDER)
+        p.fillRect(QRect(pen_r.left(), pen_r.bottom() - 1, pen_r.width(), 2), TOOLTIP_BORDER)
+        p.fillRect(QRect(pen_r.left(), pen_r.top(), 2, pen_r.height()), TOOLTIP_BORDER)
+        p.fillRect(QRect(pen_r.right() - 1, pen_r.top(), 2, pen_r.height()), TOOLTIP_BORDER)
+
+    def _draw_status(self, p: QPainter, r: QRect) -> None:
+        n = self.pet.needs
+        self._draw_tooltip_box(p, r)
+        x0, y = r.left() + 10, r.top() + 8
+        p.setFont(self.font_title)
+        p.setPen(QColor("#FFFFFF"))
+        p.drawText(QRect(x0, y, r.width() - 20, 16), Qt.AlignLeft | Qt.AlignVCenter,
+                   f"{self.app.settings.name} · {n.mood()}")
+        y += 18
+        issues = [n.level_word(stat) for stat in STATS if n[stat] < 40]
+        issues += [EFFECT_LABELS[e] for e in n.active_effects() if e in EFFECT_LABELS]
+        if self.pet.state == "sleep":
+            issues.insert(0, "dormindo")
+        p.setFont(self.font_small)
+        p.setPen(QColor("#B9A6D6"))
+        p.drawText(QRect(x0, y, r.width() - 20, 14), Qt.AlignLeft | Qt.AlignVCenter,
+                   ", ".join(issues) if issues else "tudo certo")
+        y += 16
+        for stat in STATS:
+            p.setPen(QColor("#E0E0E0"))
+            p.drawText(QRect(x0, y, 64, 13), Qt.AlignLeft | Qt.AlignVCenter, LABELS[stat])
+            value = n[stat]
+            full = int(value // 10)
+            half = (value % 10) >= 5
+            for i in range(10):
+                cell = QRect(x0 + 66 + i * 13, y, 12, 12)
+                if i < full:
+                    p.drawImage(cell, icons.status_image(stat))
+                elif i == full and half:
+                    p.drawImage(cell, icons.status_image(stat, dim=True))
+                    p.save()
+                    p.setClipRect(QRect(cell.x(), cell.y(), 6, 12))
+                    p.drawImage(cell, icons.status_image(stat))
+                    p.restore()
+                else:
+                    p.drawImage(cell, icons.status_image(stat, dim=True))
+            y += 15
+
+    def _draw_bubble(self, p: QPainter, bottom: float) -> None:
+        text = self.bubble_text
+        fm = QFontMetrics(self.font_bubble)
+        br = fm.boundingRect(QRect(0, 0, BUBBLE_MAX_W - 22, 1000), Qt.TextWordWrap, text)
+        bw, bh = br.width() + 22, br.height() + 14
+        lo, hi = self._visible_x_range()
+        x = int(max(lo + 2, min(hi - bw - 2, (WIDTH - bw) / 2)))
+        y = int(bottom - bh - 8)
+        black, white = QColor("#111111"), QColor("#FFFFFF")
+        p.fillRect(QRect(x + 2, y, bw - 4, bh), black)
+        p.fillRect(QRect(x, y + 2, bw, bh - 4), black)
+        p.fillRect(QRect(x + 4, y + 2, bw - 8, bh - 4), white)
+        p.fillRect(QRect(x + 2, y + 4, bw - 4, bh - 8), white)
+        # rabinho em escadinha apontando pro creeper
+        tx = int(WIDTH / 2)
+        for i, w in enumerate((14, 10, 6)):
+            p.fillRect(QRect(tx - w // 2, y + bh - 2 + i * 3, w, 3), black)
+            if w > 6:
+                p.fillRect(QRect(tx - w // 2 + 2, y + bh - 2 + i * 3, w - 4, 3 if i == 0 else 2), white)
+        p.setFont(self.font_bubble)
+        p.setPen(black)
+        p.drawText(QRect(x + 11, y + 7, br.width(), br.height()), Qt.TextWordWrap, text)
+
+    # ---- mouse -----------------------------------------------------------
+    def _button_at(self, pos: QPoint) -> str | None:
+        if not self.toolbar_visible():
+            return None
+        for bid, rect in self.button_rects():
+            if rect.contains(pos):
+                return bid
+        return None
+
+    def _on_sprite(self, pos: QPoint) -> bool:
+        return not self.pet.hidden and self.sprite_rect().contains(QPointF(pos))
+
+    def mousePressEvent(self, e) -> None:
+        pos = e.position().toPoint()
+        gpos = e.globalPosition().toPoint()
+        if e.button() == Qt.LeftButton:
+            bid = self._button_at(pos)
+            if bid:
+                rect = dict(self.button_rects())[bid]
+                self.app.on_toolbar(bid, self.mapToGlobal(rect.bottomLeft()))
+                return
+            if self._on_sprite(pos):
+                self.press = (gpos, time.monotonic())
+                self.drag_offset = QPointF(self.pet.x - gpos.x(), self.pet.y - gpos.y())
+            elif self.bubble_text:
+                self.bubble_text = None
+        elif e.button() == Qt.RightButton:
+            self.app.show_context_menu(gpos)
+
+    def mouseMoveEvent(self, e) -> None:
+        gpos = e.globalPosition().toPoint()
+        if self.press and e.buttons() & Qt.LeftButton:
+            if not self.dragging and (gpos - self.press[0]).manhattanLength() > 6:
+                self.dragging = self.pet.start_drag()
+                if not self.dragging:
+                    self.press = None
+                    return
+                self.hover_since = None
+            if self.dragging:
+                self.pet.drag_to(gpos.x() + self.drag_offset.x(), gpos.y() + self.drag_offset.y())
+                self.sync_position()
+            return
+        pos = e.position().toPoint()
+        bid = self._button_at(pos)
+        if bid != self.hover_btn:
+            self.hover_btn = bid
+            if bid:
+                label = dict(BUTTONS)[bid]
+                if bid == "dormir" and self.pet.state == "sleep":
+                    label = "Acordar"
+                QToolTip.showText(gpos, label, self)
+            else:
+                QToolTip.hideText()
+        if self._on_sprite(pos):
+            self._track_stroke(gpos.x())
+
+    def _track_stroke(self, x: int) -> None:
+        if self.stroke_x is None:
+            self.stroke_x = x
+            return
+        dx = x - self.stroke_x
+        if abs(dx) < 4:
+            return
+        d = 1 if dx > 0 else -1
+        now = time.monotonic()
+        if self.stroke_dir and d != self.stroke_dir:
+            self.stroke_times.append(now)
+        self.stroke_dir = d
+        self.stroke_x = x
+        self.stroke_times = [t for t in self.stroke_times if now - t < 1.5]
+        if len(self.stroke_times) >= 2:
+            self.pet.stroke()
+            self.stroke_times = self.stroke_times[-1:]
+
+    def mouseReleaseEvent(self, e) -> None:
+        if e.button() != Qt.LeftButton:
+            return
+        if self.dragging:
+            self.dragging = False
+            self.pet.end_drag()
+        elif self.press and time.monotonic() - self.press[1] < 0.5:
+            self.pet.poke()
+        self.press = None
+
+    def leaveEvent(self, e) -> None:
+        self.stroke_x = None
+        self.stroke_dir = 0
+        super().leaveEvent(e)
