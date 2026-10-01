@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 TMP = tempfile.mkdtemp(prefix="creeper-test-")
 os.environ["APPDATA"] = TMP
 os.environ["XDG_CONFIG_HOME"] = TMP
+os.environ["CREEPER_SEM_SOM"] = "1"  # registra os sons pedidos, mas não toca nada
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 if sys.platform == "win32":
     os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
@@ -30,6 +31,9 @@ for timer in app._timers:
 pet, win = app.pet, app.window
 said: list[tuple[str, str]] = []
 pet.say = lambda text, kind="chat": (said.append((kind, text)), app.on_say(text, kind))
+sounds: list[str] = []
+app.play_sound = lambda name, volume=1.0: sounds.append(name)
+pet.sfx = app.play_sound
 win.show()
 
 
@@ -81,6 +85,10 @@ pet.needs.values["sede"] = 50
 pet.feed("leite")
 run(3)
 check(not pet.needs.has("cafeinado"), "leite cura")
+pet.needs.values["sede"] = 50
+pet.feed("pocao_velocidade")
+run(3)
+check(pet.needs.has("velocidade"), "poção deixa veloz")
 
 for act in ("caminhar", "correr", "pular", "flexao", "dancar", "descansar", "gato"):
     pet.needs.values["energia"] = 90
@@ -116,7 +124,8 @@ shot("chiando")
 run(3)
 check(pet.state == "exploded" or pet.hidden, "explode")
 run(8)
-check(pet.state == "idle" and pet.needs.sulking(), "volta emburrado")
+check(not pet.hidden and pet.state not in ("exploded", "fall") and pet.needs.sulking(),
+      "volta emburrado")  # já pode ter decidido andar ou sentar
 shot("emburrado")
 
 for _ in range(30):
@@ -141,6 +150,36 @@ if app.has_tray:
 else:
     app.hide_to_tray()
     check(not app.in_tray, "sem bandeja no sistema: continua na tela")
+
+import creeper.app  # noqa: E402
+creeper.app.desktop.user_idle_seconds = lambda: 0.0
+app.last_water -= app.settings.water_minutes * 60
+app.care_tick()
+check(said[-1][0] == "reminder" and sounds[-1] == "lembrete", "lembrete de água com som")
+
+for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
+             "carinho", "tonto"):
+    check(name in sounds, f"som '{name}' tocou")
+check(any(n.startswith("nota_") for n in sounds), "dançar toca notas")
+
+from PySide6.QtWidgets import QMenu  # noqa: E402
+from creeper.sound import synth  # noqa: E402
+from creeper.ui import menus  # noqa: E402
+
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+settings_menu = next(a.menu() for a in main_menu.actions() if a.text() == "Configurações")
+check(any(a.text() == "Sons" for a in settings_menu.actions()), "menu de sons nas configurações")
+app.set_setting("sound_volume", 30)
+check(app.settings.sound_volume == 30 and sounds[-1] == "pop", "mudar volume toca amostra")
+
+bad = []
+for name in synth.SOUNDS:
+    x = synth.samples(name)
+    peak = max(abs(v) for v in x)
+    if not (0.05 < peak <= 0.96 and abs(x[0]) < 0.01 and abs(x[-1]) < 0.01 and len(x) < 3 * synth.SR):
+        bad.append(name)
+check(not bad, f"{len(synth.SOUNDS)} sons gerados sem estourar nem estalar" + (f": {bad}" if bad else ""))
 
 app.save()
 check((Path(TMP) / "CreeperCompanion" / "save.json").exists()

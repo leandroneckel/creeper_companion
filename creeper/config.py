@@ -43,6 +43,8 @@ class Settings:
     remind_sleep: bool = True
     hide_fullscreen: bool = True
     notifications: bool = True
+    sound: bool = True
+    sound_volume: int = 60         # 30 = baixo, 60 = médio, 100 = alto
 
     @classmethod
     def from_dict(cls, data: dict) -> "Settings":

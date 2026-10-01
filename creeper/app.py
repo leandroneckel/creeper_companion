@@ -11,6 +11,7 @@ from .config import Settings, load_save, write_save
 from .content import load_content
 from .needs import Needs
 from .pet import Pet
+from .sound.player import Sounds
 from .ui import menus
 from .ui.pet_window import PetWindow
 from .ui.tray import Tray
@@ -55,6 +56,11 @@ class CompanionApp(QObject):
         self._popup: QMenu | None = None
         self._last_notify = -1e9
         self._tray_hint_shown = False
+
+        self.sounds = Sounds(self.settings, self)
+        self.pet.sfx = self.play_sound
+        self.pet.sfx_stop = self.sounds.stop
+        QTimer.singleShot(500, self.sounds.load)  # na 1ª vez gera os WAV (~0,5 s); deixa a janela aparecer antes
 
         self.window = PetWindow(self)
         self.tray = Tray(self)
@@ -172,17 +178,24 @@ class CompanionApp(QObject):
         if not active:
             return
         s = self.settings
+        reminder = None
         if s.remind_water and now - self.last_water >= s.water_minutes * 60:
             self.last_water = now
-            self.pet.line("lembrete_agua", "reminder")
+            reminder = "lembrete_agua"
         elif s.remind_break and self.active_streak >= s.break_minutes * 60:
             self.active_streak = 0.0
-            self.pet.line("lembrete_pausa", "reminder")
+            reminder = "lembrete_pausa"
         elif s.remind_sleep and datetime.now().hour < 5 and now - self.last_sleep_reminder > 30 * 60:
             self.last_sleep_reminder = now
-            self.pet.line("lembrete_dormir", "reminder")
+            reminder = "lembrete_dormir"
+        if reminder and self.pet.line(reminder, "reminder"):
+            self.play_sound("lembrete")
 
-    # ---- fala ------------------------------------------------------------
+    # ---- fala e sons -----------------------------------------------------
+    def play_sound(self, name: str, volume: float = 1.0) -> None:
+        if self.window.isVisible():  # na bandeja ou escondido por tela cheia, fica quieto
+            self.sounds.play(name, volume)
+
     def on_say(self, text: str, kind: str = "chat") -> None:
         if self.window.isVisible():
             self.window.show_bubble(text)
@@ -284,6 +297,8 @@ class CompanionApp(QObject):
         if key == "hide_fullscreen" and not value:
             self.fs_hidden = False
             self.apply_visibility()
+        if key in ("sound", "sound_volume"):
+            self.play_sound("pop")  # amostra do volume escolhido
         self.save()
 
     def autostart_enabled(self) -> bool:

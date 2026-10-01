@@ -94,7 +94,8 @@ class Pet:
 
         # ligações com a interface
         self.say = lambda text, kind="chat": None
-        self.on_event = lambda name: None
+        self.sfx = lambda name, volume=1.0: None
+        self.sfx_stop = lambda name: None
 
     # ---- utilidades ------------------------------------------------------
     @property
@@ -255,6 +256,7 @@ class Pet:
     def _u_eat(self, dt: float) -> None:
         if self.clock - self.data.get("last_crumb", -1) > 0.3:
             self.data["last_crumb"] = self.clock
+            self.sfx("mastigar")
             for _ in range(2):
                 self.particles.append(Particle(
                     "crumb", x=random.uniform(-6, 6) * self.s / 3, y=-self.sprite_h * 0.62,
@@ -264,6 +266,9 @@ class Pet:
             self._finish_consume()
 
     def _u_drink(self, dt: float) -> None:
+        if self.t >= 0.15 and self.clock - self.data.get("last_gulp", -1) > 0.55:
+            self.data["last_gulp"] = self.clock
+            self.sfx("gole")
         if self.t >= 2.4:
             self._finish_consume()
 
@@ -275,6 +280,10 @@ class Pet:
         if item.get("status"):
             n.add_effect(item["status"])
         verb = "comer" if item["categoria"] == "comidas" else "beber"
+        if item.get("status") in ("dourado", "velocidade"):
+            self.sfx("brilho")
+        elif verb == "comer" and random.random() < 0.35:
+            self.sfx("arroto")
         self.held = None
         self.set_state("idle", dur=random.uniform(3, 5))
         if n.sulking():
@@ -318,6 +327,7 @@ class Pet:
         phase = (self.t % period) / period
         if phase < self.data.get("last_phase", 0):
             self.squash = 0.7
+            self.sfx("pulo")
         self.data["last_phase"] = phase
         self.jump = math.sin(phase * math.pi) * 36 * self.s / 3
         if self.t >= self.data["dur"] and phase < 0.1:
@@ -336,6 +346,10 @@ class Pet:
         self.x = self._clamp_x(self.x + math.cos(self.t * 2.5) * 40 * dt)
         if self.clock - self.data.get("last_note", -1) > 0.55:
             self.data["last_note"] = self.clock
+            # passeia pela escala em passos curtos, pra soar como melodia
+            note = self.data.get("note", 2) + random.choice((-2, -1, -1, 1, 1, 2))
+            self.data["note"] = note = max(0, min(7, note))
+            self.sfx(f"nota_{note}")
             self.particles.append(Particle(
                 "note", x=random.uniform(-1, 1) * self.sprite_w, y=-self.sprite_h * 0.9,
                 vx=random.uniform(-15, 15), vy=-40, life=1.8, text=random.choice("♪♫"),
@@ -357,6 +371,7 @@ class Pet:
                 self.data["cat_side"] = side
                 self.particles.append(Particle(
                     "icon", x=side * (self.sprite_w + 30), y=0, life=4.5, text="gato", size=2 * self.s))
+                self.sfx("miau")
                 self.line("inicio_gato", "reaction")
             self.jump = math.sin(min(1.0, self.t / 0.5) * math.pi) * 22 * self.s / 3
             if self.t > 0.6:
@@ -398,6 +413,7 @@ class Pet:
         self.swell = 0.14 * progress
         if self.needs.annoyance < 70:
             self.flash = self.swell = 0.0
+            self.sfx_stop("chiado")
             self.set_state("idle", dur=3)
             self.line("carinho_acalmou", "reaction")
             return
@@ -429,7 +445,7 @@ class Pet:
         self.needs.add_effect("chamuscado")
         self.held = None
         self.set_state("exploded")
-        self.on_event("explode")
+        self.sfx("explosao")
 
     def _u_exploded(self, dt: float) -> None:
         if self.t >= 3.5:
@@ -456,6 +472,8 @@ class Pet:
             self.vy = self.vx = 0
             self.tilt = 0
             respawn = self.data.get("respawn")
+            if respawn or height > 40:
+                self.sfx("pouso", min(1.0, 0.35 + height / 600))
             self.set_state("idle", dur=2.5)
             if respawn:
                 self.line("explodiu", "reaction")
@@ -481,6 +499,7 @@ class Pet:
             return
         self.held = item_id
         self.set_state("eat" if food else "drink", item=item_id)
+        self.sfx("pop")
 
     def do_activity(self, act_id: str) -> None:
         item = self.items.get(act_id)
@@ -493,6 +512,7 @@ class Pet:
             return
         self.set_state("exercise", kind=act_id, dur=float(item.get("duracao", 10)))
         if act_id != "gato":
+            self.sfx("pop")
             self.line(f"inicio_{act_id}", "reaction")
 
     def request_sleep(self) -> None:
@@ -530,6 +550,7 @@ class Pet:
         now = self.clock
         self.flinch_until = now + 0.35
         self.squash = 0.5
+        self.sfx("cutucao")
         if self.state == "sleep":
             self.needs.annoy(10)
             self.wake(forced=True)
@@ -556,6 +577,7 @@ class Pet:
         self.held = None
         self.jump = 0
         self.set_state("hiss")
+        self.sfx("chiado")
         self.line("sibilar", "reaction")
 
     def stroke(self) -> None:
@@ -567,6 +589,7 @@ class Pet:
         if now - self.last_pet_fun > 1.0:
             self.last_pet_fun = now
             self.needs.apply({"diversao": 2})
+            self.sfx("carinho")
             self.particles.append(Particle(
                 "heart", x=random.uniform(-0.5, 0.5) * self.sprite_w, y=-self.sprite_h * 0.95,
                 vx=random.uniform(-10, 10), vy=-35, life=1.4, size=self.s * 3))
@@ -611,6 +634,8 @@ class Pet:
         recent = [t for t in self._reversals if now - t < 1.2]
         if len(recent) >= 4:
             self._reversals.clear()
+            if now >= self.dizzy_until:
+                self.sfx("tonto")
             self.dizzy_until = now + 3.0
             self.needs.annoy(6)
             if now - self.last_shake_line > 6:

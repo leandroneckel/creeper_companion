@@ -46,6 +46,7 @@ CATEGORY_ICONS = {"comidas": "comer", "bebidas": "beber", "atividades": "ativida
 SIZES = [(2, "Pequeno"), (3, "Médio"), (4, "Grande")]
 CHATTINESS = [("pouco", "Fala pouco"), ("normal", "Normal"), ("muito", "Tagarela")]
 SPEEDS = [(0.5, "Lenta (mais tranquilo)"), (1.0, "Normal"), (2.0, "Rápida (mais trabalho)")]
+VOLUMES = [(30, "Volume baixo"), (60, "Volume médio"), (100, "Volume alto")]
 
 
 def effects_text(item: dict) -> str:
@@ -155,6 +156,13 @@ def _fill_settings(app, menu: QMenu) -> None:
            lambda v: app.set_setting("remind_break", v))
     _check(rem, "Ir dormir (depois da meia-noite)", s.remind_sleep,
            lambda v: app.set_setting("remind_sleep", v))
+
+    snd = menu.addMenu("Sons")
+    if not app.sounds.available:
+        snd.addAction("Sem saída de som disponível").setEnabled(False)
+    _check(snd, "Ligados", s.sound, lambda v: app.set_setting("sound", v))
+    snd.addSeparator()
+    _radio(snd, VOLUMES, s.sound_volume, lambda v: app.set_setting("sound_volume", v))
 
     _check(menu, "Esconder quando algo estiver em tela cheia", s.hide_fullscreen,
            lambda v: app.set_setting("hide_fullscreen", v))

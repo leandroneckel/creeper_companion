@@ -60,6 +60,15 @@ Alguns itens têm efeitos: **café** (tira o sono, mas deixa agitado e atrapalha
 
 Tudo isso pode ser ligado/desligado em **Configurações** (clique direito nele ou no ícone da bandeja).
 
+### Sons
+
+Ele chia antes de explodir (no ritmo do pisca-pisca), mastiga, dá goles, às vezes arrota, faz "bup" quando
+é cutucado, "plim" com carinho e nos lembretes, e toca uma melodia improvisada quando dança. O gato mia.
+
+- Desligar ou mudar o volume: **Configurações → Sons**.
+- Só faz barulho quando está na tela: na bandeja ou escondido por tela cheia, fica quieto.
+- Pra ouvir todos os sons em sequência: `python tools/preview_sounds.py` (ou `... pop miau` pra só alguns).
+
 ## Áreas de trabalho virtuais
 
 - **Windows:** a janela é do tipo "tool window". O Windows não a associa a nenhuma área de trabalho
@@ -75,13 +84,15 @@ Tudo isso pode ser ligado/desligado em **Configurações** (clique direito nele 
 - O ícone na bandeja no GNOME depende da extensão **AppIndicator** (já vem ativa no Ubuntu).
   Sem ela, o creeper continua funcionando, só não dá pra recolher pra bandeja.
 - A detecção de inatividade usa o `org.gnome.Mutter.IdleMonitor` (GNOME) ou `xprintidle`.
+- O som usa o servidor de áudio do sistema (PipeWire/PulseAudio, que já vêm no Ubuntu). Se o Qt não
+  conseguir abrir o áudio, o creeper só fica mudo.
 
 ## Personalizar
 
 - **Comidas, bebidas e atividades:** `content/itens.yaml`.
 - **Falas:** `content/falas.yaml`. Dá pra adicionar quantas quiser em cada situação.
 - **Dados salvos:** `%APPDATA%\CreeperCompanion\save.json` (Windows) ou
-  `~/.config/creeper-companion/save.json` (Linux).
+  `~/.config/creeper-companion/save.json` (Linux). Os sons gerados ficam em cache na pasta `sons/` ao lado.
 
 ## Estrutura
 
@@ -95,6 +106,8 @@ creeper/
   content.py            leitura dos YAML
   art/sprite.py         o creeper em pixel art (gerado por código) e suas expressões
   art/icons.py          ícones 12x12 dos itens e das barras de status
+  sound/synth.py        os sons, sintetizados por código (Python puro)
+  sound/player.py       toca os sons: cache dos WAV, volume, mudo
   ui/pet_window.py      janela transparente, balão, barra de botões, painel, mouse
   ui/menus.py           menus estilo Minecraft
   ui/tray.py            ícone da bandeja
@@ -102,6 +115,7 @@ creeper/
 content/                itens e falas (YAML)
 tools/smoke_test.py     teste automático sem tela (python tools/smoke_test.py)
 tools/preview_sprites.py  gera uma folha com todas as expressões e ícones
+tools/preview_sounds.py   toca os sons um por um (ou salva os WAV)
 tools/readme_image.py   gera a imagem do README (docs/creeper-companion.png)
 ```
 
@@ -112,12 +126,11 @@ Código sob a licença [MIT](LICENSE).
 ## Aviso
 
 Projeto de fã, sem fins comerciais. Não é oficial nem associado à Mojang Studios ou à Microsoft.
-"Minecraft" e "Creeper" são marcas da Mojang/Microsoft. Toda a arte deste projeto é desenhada por código;
-nenhuma textura do jogo é usada.
+"Minecraft" e "Creeper" são marcas da Mojang/Microsoft. Toda a arte deste projeto é desenhada por código
+e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é usado.
 
 ## Próximos passos
 
-- Sons (chiado, explosão, mastigar), com opção de mudo.
 - XP, níveis e itens desbloqueáveis.
 - Executável único (`.exe` no Windows, AppImage no Linux).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).
