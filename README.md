@@ -102,6 +102,10 @@ tools/smoke_test.py     teste automático sem tela (python tools/smoke_test.py)
 tools/preview_sprites.py  gera uma folha com todas as expressões e ícones
 ```
 
+## Licença
+
+Código sob a licença [MIT](LICENSE).
+
 ## Aviso
 
 Projeto de fã, sem fins comerciais. Não é oficial nem associado à Mojang Studios ou à Microsoft.
