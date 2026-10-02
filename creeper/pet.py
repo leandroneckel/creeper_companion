@@ -31,6 +31,40 @@ NO_INTERACTION = {"hiss", "exploded", "dragged", "fall"}
 
 GRAVITY = 2200.0
 
+MAGIC_EFFECTS = {"dourado", "velocidade", "salto", "invisivel"}   # brilham ao beber
+POTION_SWIRL = {"salto": "#7CFC5A", "encolhido": "#B388FF", "invisivel": "#C9CCD6"}
+SHRUNK = 0.5          # tamanho com a poção de encolher
+HOP_TIME = 0.75       # duração de um pulo da poção de salto
+ACTIVITY_COUNTERS = {"dancar": "dancou", "gato": "gato", "plantar": "plantou", "porco": "porco", "fogos": "fogos"}
+
+# Minerar: bloco, o que cai, golpes pra quebrar, chance relativa
+ORES = (
+    ("bloco_pedra", None, 3, 50),
+    ("bloco_carvao", "carvao", 3, 25),
+    ("bloco_ferro", "ferro", 4, 18),
+    ("bloco_diamante", "diamante", 5, 7),
+)
+# Pescar: o que vem no anzol e a chance relativa ("tesouro" = um item especial pro estoque)
+CATCHES = (("peixe", 70), ("bota", 20), ("tesouro", 10))
+FIREWORK_COLORS = ("#FF5252", "#FFD740", "#69F0AE", "#40C4FF", "#E040FB", "#FFAB40")
+
+
+@dataclass
+class Prop:
+    """Coisa que aparece junto dele durante uma atividade (bloco, poça, linha de pesca, porco).
+
+    Some sozinha quando o estado muda. Coordenadas relativas aos pés, como as partículas.
+    """
+    kind: str              # icon | big | water | line
+    name: str = ""
+    x: float = 0.0         # centro; y = base do desenho
+    y: float = 0.0
+    size: float = 12.0     # icon: lado em px; big: px por pixel do desenho; water: largura
+    flip: bool = False
+    crack: float = 0.0     # 0..1, rachaduras do bloco minerado
+    x2: float = 0.0        # line: ponta (a boia)
+    y2: float = 0.0
+
 
 @dataclass
 class Particle:
@@ -79,8 +113,14 @@ class Pet:
         self.flinch_until = 0.0
         self.dizzy_until = 0.0
         self.particles: list[Particle] = []
+        self.props: list[Prop] = []
         self.held: str | None = None   # ícone do item que está comendo/bebendo
+        self.tool: str | None = None   # ferramenta na mão (picareta, vara)
+        self.tool_angle = 0.0          # graus; positivo = golpe pra frente
         self.hidden = False            # invisível (explodiu / fugiu do gato)
+        self.size = 1.0                # encolhe com a poção
+        self.size_target = 1.0
+        self.hop: float | None = None  # tempo desde o início do pulo da poção de salto
 
         now = time.monotonic()
         self.last_chat = now
@@ -106,12 +146,28 @@ class Pet:
         return self.settings.scale
 
     @property
-    def sprite_w(self) -> int:
-        return 16 * self.s
+    def sprite_w(self) -> float:
+        return 16 * self.s * self.size
 
     @property
-    def sprite_h(self) -> int:
-        return 40 * self.s
+    def sprite_h(self) -> float:
+        return 40 * self.s * self.size
+
+    @property
+    def ghost(self) -> bool:
+        """Poção de invisibilidade: a janela desenha ele quase transparente."""
+        return self.needs.has("invisivel")
+
+    def tool_anchor(self) -> tuple[float, float]:
+        """Centro da ferramenta (relativo aos pés): do lado pra onde ele olha, na altura do corpo."""
+        return self.facing * self.sprite_w * 0.6, -self.sprite_h * 0.42 - self.jump
+
+    def tool_size(self) -> float:
+        return 8 * self.s * self.size
+
+    def rod_tip(self) -> tuple[float, float]:
+        x, y = self.tool_anchor()
+        return x + self.facing * self.tool_size() * 0.42, y - self.tool_size() * 0.5
 
     def line(self, key: str, kind: str = "chat", **fmt) -> bool:
         text = self.lines.pick(key, nome=self.settings.name, **fmt)
@@ -125,6 +181,12 @@ class Pet:
         self.state = state
         self.t = 0.0
         self.data = data
+        self.props = []
+        self.tool = None
+        self.tool_angle = 0.0
+        if self.hop is not None and state not in ("idle", "walk"):
+            self.hop = None
+            self.jump = 0.0
 
     def busy(self) -> bool:
         return self.state in BUSY
@@ -169,8 +231,17 @@ class Pet:
 
         for effect in self.needs.tick(dt, self._needs_activity(), self.settings.needs_speed):
             self.line(f"fim_{effect}")
+            if effect == "encolhido":
+                self.sfx("cresce")
+
+        self.size_target = SHRUNK if self.needs.has("encolhido") else 1.0
+        if self.size != self.size_target:
+            self.size += (self.size_target - self.size) * min(1.0, dt * 5)
+            if abs(self.size - self.size_target) < 0.01:
+                self.size = self.size_target
 
         getattr(self, f"_u_{self.state}")(dt)
+        self._hop_tick(dt)
 
         for event in self.progress.drain():
             self._on_progress(event)
@@ -286,16 +357,25 @@ class Pet:
         n = self.needs
         n.apply(item.get("efeitos"))
         cured = n.cure() if item.get("cura") else False
-        if item.get("status"):
-            n.add_effect(item["status"])
+        status = item.get("status")
+        if status:
+            n.add_effect(status)
+        if item.get("desemburra"):
+            n.sulk_until = 0.0
+            n.annoyance = 0.0
+            n.effects.pop("chamuscado", None)
         verb = "comer" if item["categoria"] == "comidas" else "beber"
         prog = self.progress
         prog.bump("comeu" if verb == "comer" else "bebeu")
         prog.collect(item["categoria"], item["id"])
+        if item["id"].startswith("pocao_"):
+            prog.collect("pocoes", item["id"])
         if item["id"] == "maca_dourada":
             prog.bump("maca_dourada")
         self._xp_fx(prog.care(verb))
-        if item.get("status") in ("dourado", "velocidade"):
+        if status == "encolhido":
+            self.sfx("encolhe")
+        elif status in MAGIC_EFFECTS or item.get("desemburra"):
             self.sfx("brilho")
         elif verb == "comer" and random.random() < 0.35:
             self.sfx("arroto")
@@ -309,7 +389,7 @@ class Pet:
                 self.line("emburrado_comer")
             return
         self.happy_until = self.clock + 2.5
-        if cured:
+        if cured and item["id"] == "leite":
             self.line("leite_cura")
         elif not self.line(f"{verb}_{item['id']}"):
             self.line(verb)
@@ -385,7 +465,7 @@ class Pet:
                 side = 1 if self.x < (left + right) / 2 else -1
                 self.data["cat_side"] = side
                 self.particles.append(Particle(
-                    "icon", x=side * (self.sprite_w + 30), y=0, life=4.5, text="gato", size=2 * self.s))
+                    "icon", x=side * (self.sprite_w + 30), y=0, life=4.5, text="gato", size=12 * self.s))
                 self.sfx("miau")
                 self.line("inicio_gato", "reaction")
             self.jump = math.sin(min(1.0, self.t / 0.5) * math.pi) * 22 * self.s / 3
@@ -411,14 +491,225 @@ class Pet:
             if self._walk_towards(target, self.walk_speed(), dt):
                 self._finish_exercise()
 
+    def _x_minerar(self, dt: float) -> None:
+        d = self.data
+        size = 10 * self.s
+        bx = self.facing * (self.sprite_w / 2 + 6 + size / 2)
+        self.tool = "minerar"
+        self.tool_angle *= max(0.0, 1 - dt * 8)   # a picareta volta depois do golpe
+        if not self.props and self.t >= d.get("next_block", 0.0):
+            block, drop, hits, _ = random.choices(ORES, weights=[o[3] for o in ORES])[0]
+            self.props = [Prop("icon", block, x=bx, size=size)]
+            d.update(drop=drop, hits=hits, done=0, next_hit=self.t + 0.45)
+        if self.props and self.t >= d["next_hit"]:
+            d["next_hit"] = self.t + 0.55
+            d["done"] += 1
+            self.tool_angle = 70.0
+            self.squash = 0.2
+            self.sfx("picareta")
+            self._chips(bx, size, 3)
+            self.props[0].crack = d["done"] / d["hits"]
+            if d["done"] >= d["hits"]:
+                self.props = []
+                self.sfx("quebra")
+                self._chips(bx, size, 12)
+                self.progress.bump("blocos")
+                d["next_block"] = self.t + 0.7
+                if d["drop"]:
+                    self.particles.append(Particle(
+                        "icon", x=bx, y=-size * 0.3, vx=-self.facing * 50, vy=-260, gravity=700, life=1.4,
+                        text=d["drop"], size=6 * self.s))
+                if d["drop"] == "diamante":
+                    self.progress.bump("diamantes")
+                    self.happy_until = self.clock + 2.5
+                    self.line("minerar_diamante", "reaction")
+        if self.t >= d["dur"]:
+            self._finish_exercise()
+
+    def _chips(self, x: float, size: float, count: int) -> None:
+        for _ in range(count):
+            self.particles.append(Particle(
+                "debris", x=x + random.uniform(-0.4, 0.4) * size, y=-random.uniform(0.2, 0.9) * size,
+                vx=random.uniform(-90, 90), vy=random.uniform(-200, -60), gravity=900, life=random.uniform(0.5, 0.9),
+                color=random.choice(("#8E8E8E", "#A5A5A5", "#6E6E6E")), size=self.s * random.choice((1, 1.5))))
+
+    def _x_pescar(self, dt: float) -> None:
+        d = self.data
+        f = self.facing
+        water_x = f * (self.sprite_w / 2 + 60)   # cabe na janela até no tamanho grande
+        self.tool = "vara"
+        if not self.props:
+            self.props = [Prop("water", x=water_x, size=80), Prop("line")]
+            d.update(phase="lancar", pt=0.0)
+        d["pt"] += dt
+        phase, pt = d["phase"], d["pt"]
+        tip_x, tip_y = self.rod_tip()
+        float_y = -3.0
+        if phase == "lancar":       # balança a vara e a boia voa num arco até a água
+            k = min(1.0, pt / 0.6)
+            self.tool_angle = -35 * math.sin(k * math.pi)
+            bx = tip_x + (water_x - tip_x) * k
+            by = tip_y + (float_y - tip_y) * k - math.sin(k * math.pi) * 60
+            if k >= 1:
+                d.update(phase="esperar", pt=0.0, bite=random.uniform(3, 7))
+                self.sfx("splash", 0.35)
+                self._splash(water_x, 4)
+        elif phase == "esperar":
+            bx, by = water_x, float_y + math.sin(self.clock * 3) * 1.5
+            if pt >= d["bite"]:
+                d.update(phase="fisgou", pt=0.0)
+                self.sfx("splash")
+                self._splash(water_x, 8)
+                self.particles.append(Particle("note", x=water_x, y=-30, vy=-25, life=0.9, text="!",
+                                               color="#FFEB3B", size=14 + self.s * 2))
+        elif phase == "fisgou":     # a boia afunda
+            bx, by = water_x, float_y + (5 if pt < 0.45 else 2)
+            if pt >= 0.55:
+                d.update(phase="puxar", pt=0.0, catch=self._roll_catch())
+        else:                       # puxar: a boia volta pra vara trazendo o que pegou
+            k = min(1.0, pt / 0.6)
+            self.tool_angle = 30 * (1 - k)
+            bx = water_x + (tip_x - water_x) * k
+            by = float_y + (tip_y - float_y) * k - math.sin(k * math.pi) * 40
+            if k >= 1:
+                self._caught(d["catch"], bx, by)
+                d.update(phase="lancar", pt=0.0)
+        line = self.props[1]
+        line.x, line.y, line.x2, line.y2 = tip_x, tip_y, bx, by
+        if self.t >= d["dur"] and phase in ("lancar", "esperar"):
+            self._finish_exercise()
+
+    def _roll_catch(self) -> tuple[str, str]:
+        """("peixe" | "bota" | "tesouro", ícone)."""
+        kind = random.choices([c for c, _ in CATCHES], weights=[w for _, w in CATCHES])[0]
+        if kind == "tesouro":
+            item = self.progress.random_special()
+            if item:
+                return "tesouro", item["id"]
+            kind = "peixe"
+        return kind, kind
+
+    def _caught(self, catch: tuple[str, str], x: float, y: float) -> None:
+        kind, icon = catch
+        self.particles.append(Particle("icon", x=x, y=y + 10, vy=-70, life=1.5, text=icon, size=7 * self.s))
+        self.sfx("pop")
+        if kind == "peixe":
+            self.progress.bump("peixes")
+            self.line("pescar_peixe", "reaction")
+        elif kind == "bota":
+            self.line("pescar_lixo", "reaction")
+        else:
+            self.progress.give(icon)
+            self.progress.bump("tesouros")
+            self.sfx("brilho")
+            self.happy_until = self.clock + 2.5
+            self.line("pescar_tesouro", "reaction", item=self.items.get(icon)["nome"])
+
+    def _splash(self, x: float, count: int) -> None:
+        for _ in range(count):
+            self.particles.append(Particle(
+                "spark", x=x + random.uniform(-8, 8), y=-2, vx=random.uniform(-60, 60), vy=random.uniform(-160, -70),
+                gravity=600, life=0.6, color=random.choice(("#90CAF9", "#E3F2FD", "#64B5F6")), size=self.s * 1.2))
+
+    def _x_plantar(self, dt: float) -> None:
+        d = self.data
+        px = self.facing * (self.sprite_w / 2 + 14)
+        if self.t < 3.0:   # cava com os pés (creeper não tem mão)
+            if self.clock - d.get("last_dig", -1.0) > 0.45:
+                d["last_dig"] = self.clock
+                self.squash = 0.35
+                self.sfx("cavar")
+                for _ in range(5):
+                    self.particles.append(Particle(
+                        "crumb", x=px + random.uniform(-6, 6), y=-2, vx=random.uniform(-70, 70),
+                        vy=random.uniform(-180, -80), gravity=700, life=0.7,
+                        color=random.choice(("#795548", "#5D4037", "#8D6E63")), size=self.s * 1.2))
+        else:
+            stage = 0 if self.t < 7 else 1 if self.t < 11 else 2
+            if d.get("stage") != stage:
+                d["stage"] = stage
+                name, size = (("plantar", 5 * self.s), ("plantar", 8 * self.s), ("flor", 9 * self.s))[stage]
+                self.props = [Prop("icon", name, x=px, size=size)]
+                self.sfx("brilho" if stage == 2 else "pop")
+                if stage == 2:
+                    self.happy_until = self.clock + 3.0
+            if stage < 2 and self.clock - d.get("last_meal", -1.0) > 0.5:   # farinha de osso brilhando
+                d["last_meal"] = self.clock
+                self.particles.append(Particle(
+                    "spark", x=px + random.uniform(-10, 10), y=-random.uniform(4, 22), vy=-20, life=0.8,
+                    color=random.choice(("#7CFC5A", "#C6FF9E")), size=self.s * 1.5))
+        if self.t >= d["dur"]:
+            self._finish_exercise()
+
+    def _x_porco(self, dt: float) -> None:
+        d = self.data
+        if "target" not in d or self._walk_towards(d["target"], self.walk_speed() * 1.8, dt):
+            d["target"] = self._clamp_x(self.x + random.choice((-1, 1)) * random.uniform(150, 450))
+        scale = self.s * 1.25
+        frame = 1 + int(self.t * 6) % 2
+        self.props = [Prop("big", f"porco_{frame}", size=scale, flip=self.facing < 0)]
+        self.jump = 7 * scale + abs(math.sin(self.t * 9)) * self.s   # montado, balançando
+        if self.clock - d.get("last_oink", 0.0) > d.get("oink_gap", 0.8):
+            d["last_oink"] = self.clock
+            d["oink_gap"] = random.uniform(2, 4)
+            self.sfx("oinc")
+        if self.t >= d["dur"]:
+            self.squash = 0.5
+            self._finish_exercise()
+
+    def _x_fogos(self, dt: float) -> None:
+        d = self.data
+        if self.clock - d.get("last_launch", -10.0) > 1.6 and self.t < d["dur"] - 1.5:
+            d["last_launch"] = self.clock
+            self.particles.append(Particle(
+                "rocket", x=self.facing * (self.sprite_w / 2 + 18) + random.uniform(-12, 12), y=-8,
+                vx=random.uniform(-25, 25), vy=-430, gravity=180, life=random.uniform(0.75, 0.95),
+                color=random.choice(FIREWORK_COLORS), size=self.s))
+            self.sfx("foguete")
+        for p in [p for p in self.particles if p.kind == "rocket"]:
+            self.particles.append(Particle("spark", x=p.x, y=p.y + 5, vx=random.uniform(-10, 10), vy=30,
+                                           life=0.35, color="#FFD180", size=self.s))   # rastro
+            if p.age + dt >= p.life:
+                self._burst(p.x, p.y, p.color)
+        if self.t >= d["dur"]:
+            self._finish_exercise()
+
+    def _burst(self, x: float, y: float, color: str) -> None:
+        self.sfx("estouro")
+        n = 36
+        for i in range(n):
+            ang = i / n * math.tau + random.uniform(-0.1, 0.1)
+            spd = random.uniform(90, 150)
+            self.particles.append(Particle(
+                "spark", x=x, y=y, vx=math.cos(ang) * spd, vy=math.sin(ang) * spd, gravity=120,
+                life=random.uniform(0.9, 1.4), color=random.choice((color, color, "#FFFFFF")), size=self.s * 1.5))
+
+    def _hop_tick(self, dt: float) -> None:
+        """Poção de salto: de vez em quando ele dá um pulo altíssimo, parado ou andando."""
+        if self.hop is None:
+            if (self.needs.has("salto") and self.state in ("idle", "walk") and not self.hidden
+                    and random.random() < dt * 0.7):
+                self.hop = 0.0
+                self.sfx("pulo")
+            return
+        self.hop += dt
+        phase = self.hop / HOP_TIME
+        if phase >= 1:
+            self.hop = None
+            self.jump = 0.0
+            self.squash = 0.7
+            self.sfx("pouso", 0.3)
+            return
+        self.jump = math.sin(phase * math.pi) * self.sprite_h * 1.1
+
     def _finish_exercise(self) -> None:
         kind = self.data["kind"]
         self.needs.apply(self.items.get(kind).get("efeitos"))
         prog = self.progress
         prog.bump("atividades")
         prog.collect("atividades", kind)
-        if kind in ("dancar", "gato"):
-            prog.bump("dancou" if kind == "dancar" else "gato")
+        if kind in ACTIVITY_COUNTERS:
+            prog.bump(ACTIVITY_COUNTERS[kind])
         self._xp_fx(prog.care("gato" if kind == "gato" else "atividade"))
         self.jump = 0
         self.hidden = False
@@ -829,6 +1120,12 @@ class Pet:
             self.particles.append(Particle(
                 "spark", x=-self.facing * self.sprite_w * 0.6, y=-random.uniform(0.1, 0.8) * self.sprite_h,
                 vx=-self.facing * 30, life=0.4, color="#B3E5FC", size=self.s * 1.5))
+        for effect, color in POTION_SWIRL.items():   # redemoinho da poção, como no jogo
+            if self.needs.has(effect) and random.random() < 0.45:
+                self.particles.append(Particle(
+                    "spark", x=random.uniform(-0.5, 0.5) * self.sprite_w,
+                    y=-random.uniform(0.1, 0.9) * self.sprite_h - self.jump,
+                    vx=random.uniform(-8, 8), vy=-25, life=0.9, color=color, size=self.s * 1.5))
 
     def _update_particles(self, dt: float) -> None:
         alive = []
@@ -928,6 +1225,19 @@ class Pet:
                 lift_l, lift_r = (2, 0) if (self.t * 3) % 1 < 0.5 else (0, 2)
             elif kind == "gato":
                 eyes, mouth = "wide", "o"
+            elif kind == "minerar":
+                eyes, lx, ly = ("squint" if self.tool_angle > 30 else "angry"), self.facing, 1
+            elif kind == "pescar":
+                phase = self.data.get("phase")
+                eyes = "wide" if phase in ("fisgou", "puxar") else "half"
+                mouth = "o" if phase == "fisgou" else mouth
+                lx = self.facing
+            elif kind == "plantar":
+                eyes, lx, ly = "happy", self.facing, 1
+            elif kind == "porco":
+                sit, bob, eyes, blush = 5, 0, "happy", True
+            elif kind == "fogos":
+                eyes, ly, blush = "wide", -1, True
 
         if clock < self.happy_until and st not in ("sleep", "hiss"):
             eyes, blush = "happy", True

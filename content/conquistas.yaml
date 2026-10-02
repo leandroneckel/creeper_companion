@@ -4,7 +4,8 @@
 #   comeu, bebeu, comidas_diferentes, bebidas_diferentes, atividades, atividades_diferentes,
 #   dancou, gato, carinhos, explosoes, acalmou (acalmou enquanto chiava), tonto, presentes,
 #   maca_dourada, tudo_cheio (todas as necessidades acima de 90), agua_feita, pausas_feitas
-#   (você apertou "Fiz!"), agua_seguidos (dias seguidos bebendo água), dias_juntos, nivel
+#   (você apertou "Fiz!"), agua_seguidos (dias seguidos bebendo água), dias_juntos, nivel,
+#   blocos (minerados), diamantes, peixes, tesouros (pescados), plantou, porco, fogos, pocoes_diferentes
 # "icone" é um dos ícones de creeper/art/icons.py.
 
 conquistas:
@@ -167,3 +168,67 @@ conquistas:
     meta: 30
     xp: 0
     icone: xp
+
+  - id: mineiro
+    nome: Mineiro de primeira viagem
+    descricao: Quebre 20 blocos minerando.
+    contador: blocos
+    meta: 20
+    xp: 40
+    icone: minerar
+
+  - id: diamantes
+    nome: Diamantes!
+    descricao: Ache um diamante minerando.
+    contador: diamantes
+    meta: 1
+    xp: 30
+    icone: diamante
+
+  - id: pescador
+    nome: Pescador
+    descricao: Pesque 10 peixes.
+    contador: peixes
+    meta: 10
+    xp: 40
+    icone: peixe
+
+  - id: pescaria_premiada
+    nome: Pescaria premiada
+    descricao: Pesque um tesouro.
+    contador: tesouros
+    meta: 1
+    xp: 30
+    icone: pescar
+
+  - id: mao_verde
+    nome: Mão verde
+    descricao: Plante 5 flores.
+    contador: plantou
+    meta: 5
+    xp: 30
+    icone: flor
+
+  - id: cavaleiro_suino
+    nome: Cavaleiro suíno
+    descricao: Dê uma volta de porco.
+    contador: porco
+    meta: 1
+    xp: 20
+    icone: porco
+
+  - id: reveillon
+    nome: Réveillon
+    descricao: Solte fogos 3 vezes.
+    contador: fogos
+    meta: 3
+    xp: 30
+    icone: fogos
+
+  - id: alquimista
+    nome: Alquimista
+    descricao: Beba 5 poções diferentes.
+    contador: pocoes_diferentes
+    meta: 5
+    xp: 60
+    icone: pocao_cura

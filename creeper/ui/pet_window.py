@@ -83,15 +83,15 @@ class PetWindow(QWidget):
             self.move(x, y)
 
     def sprite_rect(self) -> QRectF:
-        pet = self.pet
-        w = self.sw * (1 + pet.swell + 0.22 * pet.squash)
-        h = self.sh * (1 + pet.swell - 0.22 * pet.squash)
+        pet = self.pet   # pet.sprite_w/h já incluem a poção de encolher
+        w = pet.sprite_w * (1 + pet.swell + 0.22 * pet.squash)
+        h = pet.sprite_h * (1 + pet.swell - 0.22 * pet.squash)
         return QRectF(WIDTH / 2 - w / 2, self.H - h - pet.jump, w, h)
 
     def toolbar_rect(self) -> QRect:
         w = len(BUTTONS) * SLOT + 8
         h = SLOT + 8
-        return QRect((WIDTH - w) // 2, self.H - self.sh - 12 - h, w, h)
+        return QRect((WIDTH - w) // 2, int(self.H - self.pet.sprite_h) - 12 - h, w, h)
 
     def button_rects(self) -> list[tuple[str, QRect]]:
         bar = self.toolbar_rect()
@@ -106,7 +106,7 @@ class PetWindow(QWidget):
         if not self.app.progress.presents or pet.hidden or pet.state in ("dragged", "fall", "exploded"):
             return None
         g = 8 * pet.s
-        return QRect(int(WIDTH / 2 - self.sw / 2 - g - 6), self.H - g, g, g)
+        return QRect(int(WIDTH / 2 - pet.sprite_w / 2 - g - 6), self.H - g, g, g)
 
     def status_rect(self) -> QRect:
         h = self.status_height()
@@ -181,7 +181,7 @@ class PetWindow(QWidget):
     def _signature(self):
         """Resumo de tudo que aparece na tela; se não mudou, não precisa redesenhar."""
         pet = self.pet
-        if pet.particles:
+        if pet.particles or pet.props or pet.size != pet.size_target:
             return None
         r = self.sprite_rect()
         prog = self.app.progress
@@ -193,7 +193,8 @@ class PetWindow(QWidget):
                       prog.level, int(prog.fraction() * 129), prog.losing)
         return (pet.pose(), pet.hidden, pet.held, round(pet.tilt), round(r.x()), round(r.y()),
                 round(r.width()), round(r.height()), self.bubble_text, self.toolbar_visible(),
-                self.hover_btn, pet.state == "sleep", status, prog.presents, self.sticky is None)
+                self.hover_btn, pet.state == "sleep", status, prog.presents, self.sticky is None,
+                pet.ghost, pet.tool, round(pet.tool_angle))
 
     def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
         """Mostra uma fala. Com `action` ("agua"/"pausa"), o balão ganha o botão "Fiz!" e volta
@@ -229,6 +230,10 @@ class PetWindow(QWidget):
         gift = self.gift_rect()
         if gift:
             rects.append(gift.adjusted(-2, -12, 2, 0))
+        for prop in self.pet.props:
+            rects.append(self._prop_rect(prop).toRect().adjusted(-4, -4, 4, 4))
+        if self.pet.tool:
+            rects.append(self._tool_rect().toRect().adjusted(-8, -8, 8, 8))
         for part in self.pet.particles:
             # a máscara também recorta o desenho no X11, então inclui cada partícula
             if part.kind == "boom":
@@ -255,17 +260,19 @@ class PetWindow(QWidget):
 
         if not pet.hidden:
             if pet.state not in ("dragged", "fall"):
-                lift = max(0.35, 1 - pet.jump / (self.sh * 0.5))
-                sw = self.sw * 1.05 * lift
+                lift = max(0.35, 1 - pet.jump / (pet.sprite_h * 0.5))
+                sw = pet.sprite_w * 1.05 * lift
                 p.setPen(Qt.NoPen)
-                p.setBrush(QColor(0, 0, 0, int(60 * lift)))
+                p.setBrush(QColor(0, 0, 0, int(60 * lift * (0.3 if pet.ghost else 1))))
                 p.drawEllipse(QRectF(cx - sw / 2, ground - 6, sw, 6))
             self._draw_gift(p)
+            self._draw_props(p, behind=True)
             self._draw_creeper(p)
+            self._draw_props(p, behind=False)
 
         self._draw_particles(p)
 
-        top = self.H - self.sh - 10
+        top = self.H - pet.sprite_h - 10
         if self.toolbar_visible():
             self._draw_toolbar(p)
             top = self.toolbar_rect().top() - 4
@@ -282,6 +289,8 @@ class PetWindow(QWidget):
         img = sprite.render(pet.pose())
         rect = self.sprite_rect()
         p.save()
+        if pet.ghost:
+            p.setOpacity(0.28)
         if pet.tilt:
             pivot = QPointF(rect.center().x(), rect.top() + rect.height() * 0.3)
             p.translate(pivot)
@@ -298,7 +307,78 @@ class PetWindow(QWidget):
                 p.rotate(-35)
             p.drawImage(QRectF(-size / 2, -size / 2, size, size), icons.image(pet.held))
             p.restore()
+        if pet.tool:
+            tool = self._tool_rect()
+            p.save()
+            p.translate(tool.center())
+            if pet.facing < 0:
+                p.scale(-1, 1)   # espelha pra quando ele olha pra esquerda
+            p.rotate(pet.tool_angle)
+            p.drawImage(QRectF(-tool.width() / 2, -tool.height() / 2, tool.width(), tool.height()),
+                        icons.image(pet.tool))
+            p.restore()
         p.restore()
+
+    def _tool_rect(self) -> QRectF:
+        pet = self.pet
+        x, y = pet.tool_anchor()
+        size = pet.tool_size()
+        return QRectF(WIDTH / 2 + x - size / 2, self.H + y - size / 2, size, size)
+
+    def _prop_rect(self, prop) -> QRectF:
+        cx, gy = WIDTH / 2 + prop.x, self.H + prop.y
+        if prop.kind == "big":
+            img = icons.big_image(prop.name)
+            w, h = img.width() * prop.size, img.height() * prop.size
+            return QRectF(cx - w / 2, gy - h, w, h)
+        if prop.kind == "water":
+            return QRectF(cx - prop.size / 2, gy - 7, prop.size, 9)
+        if prop.kind == "line":
+            x1, y1 = WIDTH / 2 + prop.x, self.H + prop.y
+            x2, y2 = WIDTH / 2 + prop.x2, self.H + prop.y2
+            return QRectF(min(x1, x2) - 3, min(y1, y2) - 3, abs(x2 - x1) + 6, abs(y2 - y1) + 6)
+        return QRectF(cx - prop.size / 2, gy - prop.size, prop.size, prop.size)
+
+    def _draw_props(self, p: QPainter, behind: bool) -> None:
+        """Objetos das atividades. Atrás dele: poça, porco, bloco, planta; na frente: linha de pesca."""
+        for prop in self.pet.props:
+            if (prop.kind == "line") == behind:
+                continue
+            r = self._prop_rect(prop)
+            if prop.kind == "water":
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor("#2F6FD0"))
+                p.drawRoundedRect(r, 4, 4)
+                p.setBrush(QColor("#5B9BF0"))
+                p.drawRoundedRect(r.adjusted(3, 1, -3, -4), 3, 3)
+                wave = int(self.pet.clock * 2) % 2
+                p.fillRect(QRectF(r.x() + 10 + wave * 6, r.y() + 2, 10, 1.5), QColor(255, 255, 255, 150))
+                p.fillRect(QRectF(r.right() - 26 - wave * 6, r.y() + 4, 8, 1.5), QColor(255, 255, 255, 120))
+            elif prop.kind == "line":
+                p.setPen(QColor(235, 235, 235, 220))
+                p.drawLine(QPointF(WIDTH / 2 + prop.x, self.H + prop.y), QPointF(WIDTH / 2 + prop.x2, self.H + prop.y2))
+                p.setPen(Qt.NoPen)
+                bx, by = WIDTH / 2 + prop.x2, self.H + prop.y2
+                p.fillRect(QRectF(bx - 3, by - 6, 6, 3), QColor("#E53935"))   # boia
+                p.fillRect(QRectF(bx - 3, by - 3, 6, 3), QColor("#FAFAFA"))
+            elif prop.kind == "big":
+                img = icons.big_image(prop.name)
+                if prop.flip:
+                    img = img.mirrored(True, False)
+                p.drawImage(r, img)
+            else:
+                p.drawImage(r, icons.image(prop.name))
+                if prop.crack > 0:
+                    self._draw_cracks(p, r, prop.crack)
+
+    def _draw_cracks(self, p: QPainter, r: QRectF, amount: float) -> None:
+        """Rachaduras do bloco sendo minerado, aumentando a cada golpe."""
+        px = r.width() / 12
+        cracks = [(5, 5), (6, 6), (4, 6), (6, 4), (3, 7), (7, 3), (8, 7), (2, 4), (7, 9), (4, 9), (9, 5),
+                  (2, 8), (9, 2), (1, 2), (10, 9), (5, 1), (6, 10), (1, 10)]
+        color = QColor(20, 20, 20, 190)
+        for x, y in cracks[:max(1, int(len(cracks) * amount))]:
+            p.fillRect(QRectF(r.x() + x * px, r.y() + y * px, px, px), color)
 
     def _draw_gift(self, p: QPainter) -> None:
         rect = self.gift_rect()
@@ -341,10 +421,15 @@ class PetWindow(QWidget):
                 p.drawImage(QRectF(x - size / 2, y - size / 2, size, size), icons.image("carinho"))
                 p.setOpacity(1.0)
             elif part.kind == "icon":
-                size = 12 * pet.s
+                size = part.size
                 p.setOpacity(max(0.0, min(1.0, fade * 3)))
                 p.drawImage(QRectF(x - size / 2, y - size, size, size), icons.image(part.text))
                 p.setOpacity(1.0)
+            elif part.kind == "rocket":
+                s = part.size
+                p.fillRect(QRectF(x - s * 0.7, y - s * 2.5, s * 1.4, s * 3), QColor(part.color))
+                p.fillRect(QRectF(x - s * 0.7, y - s * 3.2, s * 1.4, s * 0.7), QColor("#FAFAFA"))
+                p.fillRect(QRectF(x - s * 0.25, y + s * 0.5, s * 0.5, s * 1.5), QColor("#8D6E63"))
             elif part.kind == "smoke":
                 size = part.size * (1 + 1.5 * part.age / part.life)
                 color = QColor(part.color)

@@ -1,4 +1,5 @@
 """Ícones em pixel art (12x12) para itens, atividades, botões e barras de status."""
+import random
 from functools import lru_cache
 
 from PySide6.QtCore import Qt
@@ -480,7 +481,254 @@ ICONS: dict[str, tuple[list[str], dict[str, str]]] = {
         "............",
         "............",
     ], {"g": "#4E8A12", "G": "#B5F23A", "h": "#F4FFC2", "D": "#7FD321"}),
+    # ---- comidas e bebidas desbloqueáveis ----
+    "baga_doce": ([
+        "............",
+        "....gg......",
+        "...gGGg.....",
+        "....gg.r....",
+        "..rr..rRr...",
+        ".rRhr.rrr...",
+        ".rrrr..r.rr.",
+        "..rr...rrRhr",
+        ".....rr.rrrr",
+        "....rRhr.rr.",
+        "....rrrr....",
+        ".....rr.....",
+    ], {"r": "#C62828", "R": "#8E1B1B", "h": "#FF8A80", "g": "#43A047", "G": "#2E7D32"}),
+    "melancia": ([
+        "............",
+        "............",
+        "............",
+        "rrrrrrrrrrrr",
+        "rrbrrrrrbrrr",
+        ".rrrrbrrrrr.",
+        ".wrrrrrrrrw.",
+        "..wrrbrrrw..",
+        "..GwwwwwwG..",
+        "...GGGGGG...",
+        "............",
+        "............",
+    ], {"r": "#E53935", "b": "#212121", "w": "#C5E1A5", "G": "#2E7D32"}),
+    "peixe": ([
+        "............",
+        "............",
+        "............",
+        "....dddd....",
+        "..ddOOOOd.dd",
+        ".dOeOOOOOddO",
+        "dOOOOOOOOOd.",
+        ".dOOOOOOOddO",
+        "..ddOOOOd.dd",
+        "....dddd....",
+        "............",
+        "............",
+    ], {"d": "#8D4E2A", "O": "#D9893F", "e": "#1A1A1A"}),
+    "mel": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#FFB300", "h": "#FFE082", "D": "#C77C00"}),
+    "pocao_salto": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#7CFC5A", "h": "#D4FFC4", "D": "#3FA52A"}),
+    "pocao_encolher": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#B388FF", "h": "#EDE7F6", "D": "#7E57C2"}),
+    "pocao_invisibilidade": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#9EA3B0", "h": "#E8EAF0",
+                                       "D": "#6B7080"}),
+    "pocao_cura": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#F44369", "h": "#FFC1CF", "D": "#B0103A"}),
+    # ---- atividades desbloqueáveis ----
+    "minerar": ([
+        "....HHHH....",
+        ".....SHHHH..",
+        ".........HH.",
+        "........bSH.",
+        ".......b..HH",
+        "......b...SH",
+        ".....B....H.",
+        "....b.......",
+        "...B........",
+        "..b.........",
+        ".B..........",
+        "............",
+    ], {"H": "#CFD8DC", "S": "#78909C", "b": "#A1887F", "B": "#5D4037"}),
+    "pescar": ([
+        "..........b.",
+        ".........b.w",
+        "........b..w",
+        ".......b...w",
+        "......b....w",
+        ".....b.....w",
+        "....B......w",
+        "...b.......r",
+        "..b........R",
+        ".B..........",
+        "B...........",
+        "............",
+    ], {"b": "#A1887F", "B": "#5D4037", "w": "#E0E0E0", "r": "#E53935", "R": "#FAFAFA"}),
+    "plantar": ([
+        "............",
+        ".....gg.....",
+        "...ggGgg....",
+        "..gGggGgg...",
+        "...ggGGg.g..",
+        ".g..gGgggg..",
+        ".gg..bg.....",
+        "..g..b......",
+        ".....b......",
+        "...ddbdd....",
+        "..dDddDdd...",
+        "............",
+    ], {"g": "#66BB6A", "G": "#2E7D32", "b": "#6D4C41", "d": "#795548", "D": "#4E342E"}),
+    "porco": ([
+        "............",
+        "............",
+        ".pppppppppp.",
+        ".pppppppppp.",
+        ".pwkppppkwp.",
+        ".pppppppppp.",
+        ".pppSSSSppp.",
+        ".pppnSSnppp.",
+        ".pppppppppp.",
+        ".PPPPPPPPPP.",
+        "............",
+        "............",
+    ], {"p": "#F0A5A2", "P": "#D98583", "S": "#F7C1BF", "n": "#8B3A3A", "w": "#FFFFFF", "k": "#1A1A1A"}),
+    "fogos": ([
+        "......r.....",
+        ".....rRr....",
+        ".....wWw....",
+        ".....rRr....",
+        ".....wWw....",
+        ".....rRr....",
+        ".....rRr....",
+        "......b.....",
+        "......b.....",
+        "......b.....",
+        ".....y.y....",
+        "....y...y...",
+    ], {"r": "#E53935", "R": "#B71C1C", "w": "#FAFAFA", "W": "#E0E0E0", "b": "#8D6E63", "y": "#FFB300"}),
+    # ---- coisas que aparecem nas atividades ----
+    "vara": ([   # a vara na mão dele, sem linha (a linha de verdade é desenhada até a boia)
+        "..........b.",
+        ".........b..",
+        "........b...",
+        ".......b....",
+        "......b.....",
+        ".....b......",
+        "....B.......",
+        "...b........",
+        "..b.........",
+        ".B..........",
+        "B...........",
+        "............",
+    ], {"b": "#A1887F", "B": "#5D4037"}),
+    "flor": ([
+        "............",
+        "...rr.rr....",
+        "..rRRrRRr...",
+        "..rRyyRRr...",
+        "...rRRRr....",
+        "....rgr.....",
+        "..g..g......",
+        "..gg.g.gg...",
+        "...ggg.g....",
+        ".....gg.....",
+        "...ddddd....",
+        "..dDddDdd...",
+    ], {"r": "#E53935", "R": "#B71C1C", "y": "#212121", "g": "#43A047", "d": "#795548", "D": "#4E342E"}),
+    "diamante": ([
+        "............",
+        "............",
+        "...cccccc...",
+        "..cCCwCCCc..",
+        ".cCwwCCCCCc.",
+        ".cCCCCCCCCc.",
+        "..cCCCCCCc..",
+        "...cCCCCc...",
+        "....cCCc....",
+        ".....cc.....",
+        "............",
+        "............",
+    ], {"c": "#1E9C8C", "C": "#4AEDD9", "w": "#E0FFFA"}),
+    "bota": ([
+        "............",
+        "...bbbb.....",
+        "...bBBb.....",
+        "...bBBb.....",
+        "...bBBb.....",
+        "...bBBbb....",
+        "...bBBBBbb..",
+        "..bBBBBBBBb.",
+        "..bBBBBBBBb.",
+        "..bbbbbbbbb.",
+        "............",
+        "............",
+    ], {"b": "#4E342E", "B": "#795548"}),
 }
+
+# Variações de desenhos que já existem
+ICONS["sopa_beterraba"] = (ICONS["ensopado"][0], {"s": "#B71C1C", "R": "#E57373", "b": "#8D6E63", "w": "#5D4037"})
+ICONS["cenoura_dourada"] = (ICONS["cenoura"][0], {"o": "#FFCA28", "O": "#C79100", "g": "#FFE082", "G": "#FFB300"})
+
+_LUMP = [
+    "............",
+    "............",
+    "............",
+    "....LLL.....",
+    "..LLlLLL....",
+    ".LlLLLLLL...",
+    ".LLLLLDLLL..",
+    "..LLLDDLLL..",
+    "...LLLLLD...",
+    ".....DD.....",
+    "............",
+    "............",
+]
+ICONS["carvao"] = (_LUMP, {"L": "#2E2E2E", "l": "#5A5A5A", "D": "#151515"})
+ICONS["ferro"] = (_LUMP, {"L": "#D8AF93", "l": "#F2D6C2", "D": "#9C7A63"})
+
+# Blocos de minério: textura de pedra com manchas do minério por cima.
+_STONE_RNG = random.Random(7)
+_STONE = ["".join(_STONE_RNG.choice("sssSSd") for _ in range(12)) for _ in range(12)]
+_ORE = [
+    "............",
+    ".oo.........",
+    ".oOo....oo..",
+    "..o....oOO..",
+    "........o...",
+    "....oo......",
+    "...oOOo.....",
+    "....oo...oo.",
+    ".........oOo",
+    ".oo......o..",
+    ".oOo........",
+    "............",
+]
+_STONE_COLORS = {"s": "#8E8E8E", "S": "#A5A5A5", "d": "#6E6E6E"}
+
+
+def _ore_block(ore: str | None, light: str = "", dark: str = "") -> tuple[list[str], dict[str, str]]:
+    if ore is None:
+        return _STONE, _STONE_COLORS
+    grid = ["".join(o if o != "." else s for s, o in zip(srow, orow)) for srow, orow in zip(_STONE, _ORE)]
+    return grid, {**_STONE_COLORS, "o": light, "O": dark}
+
+
+ICONS["bloco_pedra"] = _ore_block(None)
+ICONS["bloco_carvao"] = _ore_block("carvao", "#2B2B2B", "#454545")
+ICONS["bloco_ferro"] = _ore_block("ferro", "#D8AF93", "#AF8E77")
+ICONS["bloco_diamante"] = _ore_block("diamante", "#4AEDD9", "#A1FBE8")
+
+# Desenhos maiores que 12x12 (tamanho livre).
+BIG: dict[str, tuple[list[str], dict[str, str]]] = {}
+_PIG_TOP = [
+    "...........ppppp",
+    ".PPPPPPPPPPpwkpp",
+    "ppppppppppppppps",
+    "pppppppppppppppn",
+    "ppppppppppppppps",
+    "ppppppppppppppp.",
+    ".pppppppppppppp.",
+    ".PP.PP...PP.PP..",
+]
+_PIG_COLORS = {"p": "#F0A5A2", "P": "#D98583", "w": "#FFFFFF", "k": "#1A1A1A", "s": "#F7C1BF",
+               "n": "#8B3A3A", "D": "#6D4C41"}
+BIG["porco_1"] = (_PIG_TOP + [".PP.PP...PP.PP..", ".DD.DD...DD.DD.."], _PIG_COLORS)
+BIG["porco_2"] = (_PIG_TOP + ["PP...PP.PP...PP.", "DD...DD.DD...DD."], _PIG_COLORS)
 
 # Ícones pequenos (8x8) das barras de status, estilo barra de fome do Minecraft.
 STATUS_ICONS: dict[str, tuple[list[str], dict[str, str]]] = {
@@ -541,13 +789,15 @@ def names() -> list[str]:
     return list(ICONS)
 
 
-def _build(grid: list[str], palette: dict[str, str], size: int, dim: bool = False) -> QImage:
-    img = QImage(size, size, QImage.Format_ARGB32_Premultiplied)
+def _build(grid: list[str], palette: dict[str, str], size: int | None = None, dim: bool = False) -> QImage:
+    """Monta a imagem a partir da grade. Sem `size`, usa o tamanho da própria grade."""
+    w, h = (size, size) if size else (len(grid[0]), len(grid))
+    img = QImage(w, h, QImage.Format_ARGB32_Premultiplied)
     img.fill(Qt.transparent)
     p = QPainter(img)
     colors = {k: QColor(v) for k, v in palette.items()}
-    for y, row in enumerate(grid[:size]):
-        for x, ch in enumerate(row[:size]):
+    for y, row in enumerate(grid[:h]):
+        for x, ch in enumerate(row[:w]):
             color = colors.get(ch)
             if color is None:
                 continue
@@ -562,6 +812,12 @@ def _build(grid: list[str], palette: dict[str, str], size: int, dim: bool = Fals
 def image(name: str) -> QImage:
     grid, palette = ICONS.get(name, ICONS["maca"])
     return _build(grid, palette, 12)
+
+
+@lru_cache(maxsize=None)
+def big_image(name: str) -> QImage:
+    grid, palette = BIG[name]
+    return _build(grid, palette)
 
 
 @lru_cache(maxsize=None)

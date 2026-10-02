@@ -358,3 +358,85 @@ fiz_pausa:
 perdendo_xp:
   - "Tô tão mal que tô até esquecendo as coisas... tô perdendo XP!"
   - "Me ajuda aqui... sem cuidado eu vou perdendo XP."
+
+# ---- itens e atividades desbloqueáveis ----
+comer_baga_doce:
+  - "Baga doce! Espeta um pouquinho, mas vale a pena."
+  - "Docinha! Igual eu. Quer dizer, eu sou mais explosivo."
+comer_melancia:
+  - "Melancia! Comida e bebida ao mesmo tempo. Eficiência de creeper."
+  - "Cuspi uma semente em algum lugar da sua área de trabalho. Desculpa."
+comer_peixe:
+  - "Peixe assado! Ainda bem que o gato não tá aqui pra ver."
+  - "Peixe! Escondi um pedaço pra ninguém felino achar."
+comer_sopa_beterraba:
+  - "Sopa de beterraba! Vermelhinha. Combina com o meu medo de gatos."
+  - "Tem gosto de terra. Terra boa, tá?"
+comer_cenoura_dourada:
+  - "Cenoura dourada! Agora eu enxergo até os pixels mortos do seu monitor."
+  - "Isso é comida de rei. Ou de cavalo. Mas eu aceito."
+beber_mel:
+  - "Mel! Grudento e perfeito."
+  - "Mel cura qualquer coisa. Menos o meu medo de gatos."
+beber_pocao_salto:
+  - "Poção de salto! Segura que eu vou longe!"
+  - "Tô sentindo as pernas formigando... BOING!"
+beber_pocao_encolher:
+  - "Opa... o mundo ficou maior? Ou eu fiquei pequeno?"
+  - "Eu tô... miniatura! Cuidado pra não me perder."
+beber_pocao_invisibilidade:
+  - "Você não me vê. Eu sou só uma ideia de creeper."
+  - "Invisível! Agora sim posso chegar de fininho. Brincadeira."
+beber_pocao_cura:
+  - "Ahh... tudo zerado. Me sinto um creeper novo!"
+  - "Poção de cura! Esqueci até por que eu tava bravo."
+
+inicio_minerar:
+  - "Picareta na mão! Bom, na... ponta do corpo."
+  - "Vou minerar. Se eu achar diamante, a gente divide."
+fim_minerar:
+  - "Cansei de bater em pedra. Mas foi terapêutico."
+  - "Minerei o suficiente por hoje. Meu braço imaginário tá doendo."
+minerar_diamante:
+  - "DIAMANTES! Eu sabia! Eu SABIA!"
+  - "Achei diamante! Ninguém conta pro Steve."
+inicio_pescar:
+  - "Vou pescar. Shhh... silêncio que os peixes escutam."
+  - "Pescaria! Pena que o melhor peixe vai pro gato."
+fim_pescar:
+  - "Chega de pescar. Fiquei com cheiro de rio."
+  - "Pescar é bom porque ninguém me cutuca."
+pescar_peixe:
+  - "Peguei um peixe!"
+  - "Peixe! Esse não escapa."
+  - "Olha o tamanho desse! Tá, é pequeno. Mas é meu."
+pescar_lixo:
+  - "Uma bota velha. Clássico."
+  - "Pesquei... uma bota? Quem joga bota no rio?"
+pescar_tesouro:
+  - "Tesouro! Pesquei {item}!"
+  - "Olha só, {item}! Esse rio é rico."
+inicio_plantar:
+  - "Vou plantar uma flor pra você. Sem mãos, mas com amor."
+  - "Cavando com os pés. É assim que creeper faz jardinagem."
+fim_plantar:
+  - "Pronto! Uma flor pra enfeitar a barra de tarefas."
+  - "Plantei e cresceu! Eu tenho o dedo verde. Bom, o corpo todo verde."
+inicio_porco:
+  - "Arranjei um porco! Segura firme... ele não tem sela."
+  - "Ihá! Quer dizer... oinc!"
+fim_porco:
+  - "O porco cansou de mim. Eu entendo."
+  - "Melhor passeio da minha vida. O porco discorda."
+inicio_fogos:
+  - "Fogos de artifício! É a única explosão que todo mundo gosta."
+  - "Olha pro alto! Eu explodo coisas COM estilo."
+fim_fogos:
+  - "Que lindo! Se eu fosse feito de fogos, seria assim."
+  - "Acabaram os foguetes. Eu poderia ser o próximo. Não, né."
+fim_salto:
+  - "Minhas pernas voltaram ao normal. Que pena."
+fim_encolhido:
+  - "Voltei ao tamanho normal! Senti falta da vista daqui de cima."
+fim_invisivel:
+  - "Tô visível de novo! Sentiu minha falta?"

@@ -64,9 +64,26 @@ Se alguma necessidade fica crítica, ele vai **perdendo XP** aos poucos, mas nun
 Os primeiros níveis saem em horas; depois, mais ou menos um por dia de uso.
 
 Cada nível novo traz um **presente**, e de vez em quando ele acha um sozinho. O presente aparece no chão
-ao lado dele (e ele fica por perto esperando você abrir). Dentro vem **maçã dourada**, **poção de
-velocidade** ou XP. Esses dois itens especiais têm quantidade (o número aparece no menu); os outros
-são infinitos.
+ao lado dele (e ele fica por perto esperando você abrir). Dentro vem um item especial (maçã dourada ou
+uma poção) ou XP. Os itens especiais têm quantidade (o número aparece no menu); os outros são infinitos.
+
+Subindo de nível você desbloqueia coisas novas (no menu, as trancadas aparecem como "??? (nível N)"):
+
+| Nível | Desbloqueia |
+|---|---|
+| 2, 3, 7 | Baga doce, fatia de melancia, peixe assado |
+| 4 | **Minerar**: ele quebra blocos com a picareta (às vezes sai diamante) |
+| 6 | **Poção de salto**: pulos altíssimos por 3 min |
+| 9 | **Pescar**: peixe, bota velha ou, com sorte, um item especial |
+| 11 | Garrafa de mel (cura enjoo) |
+| 13 | **Plantar uma flor**: ele cava, planta e a flor cresce |
+| 14 | **Poção de encolher**: fica do tamanho de um botão por 3 min |
+| 16 | Sopa de beterraba |
+| 18 | **Cavalgar um porco** |
+| 20 | **Poção de invisibilidade**: fica quase transparente por 2 min |
+| 22 | Cenoura dourada |
+| 24 | **Poção de cura**: tira o emburrado e os efeitos ruins |
+| 26 | **Fogos de artifício** |
 
 **Conquistas** (como "Tsss... BUM!" e "Uma semana juntos") aparecem num aviso no canto da tela e dão XP
 extra. A lista fica no menu, em **Conquistas**.
@@ -156,8 +173,7 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 ## Próximos passos
 
-- Coisas pra desbloquear com os níveis: guarda-roupa (chapéus, cores, rastros, creeper carregado),
-  poções, comidas e atividades novas, e comportamentos (vir quando chamado, brincar sozinho,
-  subir nas janelas, brincadeiras com você).
+- Mais coisas pra desbloquear com os níveis: guarda-roupa (chapéus, cores, rastros, creeper carregado)
+  e comportamentos (vir quando chamado, brincar sozinho, subir nas janelas, brincadeiras com você).
 - Executável único (`.exe` no Windows, AppImage no Linux).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).

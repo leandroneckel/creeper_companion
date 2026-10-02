@@ -148,7 +148,7 @@ class CompanionApp(QObject):
         """30 fps quando ele está se mexendo; bem menos quando está parado."""
         pet, win = self.pet, self.window
         moving = (pet.state in ("walk", "exercise", "hiss", "dragged", "fall", "eat", "drink", "exploded")
-                  or pet.jump > 0 or pet.squash > 0 or win.dragging)
+                  or pet.jump > 0 or pet.squash > 0 or pet.size != pet.size_target or win.dragging)
         if not win.isVisible():
             ms = 250
         elif moving or win.hover_since is not None:

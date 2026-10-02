@@ -46,11 +46,11 @@ def run(seconds: float, dt: float = 0.033) -> None:
         win.frame()
 
 
-def shot(name: str) -> None:
+def shot(name: str, hover: bool = True) -> None:
     if SHOTS:
         import time
         SHOTS.mkdir(parents=True, exist_ok=True)
-        win.hover_since = time.monotonic() - 5
+        win.hover_since = time.monotonic() - 5 if hover else None
         win.repaint()
         win.grab().save(str(SHOTS / f"{name}.png"))
 
@@ -237,11 +237,95 @@ again = Progress.from_dict(json.loads(json.dumps(prog.to_dict())), app.items, ap
 check((again.level, again.inventory, set(again.done), again.counters) ==
       (prog.level, prog.inventory, set(prog.done), prog.counters), "progresso salva e carrega igual")
 fresh = Progress.from_dict(None, app.items, app.achievements)
-check(fresh.level == 1 and fresh.inventory == {"maca_dourada": 1, "pocao_velocidade": 2},
+check(fresh.level == 1 and fresh.inventory == {i["id"]: i["limitado"]["inicial"] for i in app.items.limited()},
       "save antigo começa no nível 1 com o estoque inicial")
 
+# ---- itens e atividades desbloqueáveis ---------------------------------------
+import time  # noqa: E402
+
+prog.level = 1
+pet.set_state("idle", dur=999)
+pet.feed("baga_doce")
+pet.do_activity("minerar")
+run(0.1)
+check(pet.state == "idle", "item trancado não pode ser usado no nível 1")
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+food_menu = next(a.menu() for a in main_menu.actions() if a.text() == "Comer")
+check(any(a.text() == "??? (nível 2)" and not a.isEnabled() for a in food_menu.actions()), "menu mostra item trancado")
+
+prog.level = 30   # libera tudo pra testar
+for food in ("baga_doce", "melancia", "peixe", "sopa_beterraba", "cenoura_dourada", "mel"):
+    pet.needs.values.update(fome=40, sede=40)
+    pet.set_state("idle", dur=999)
+    pet.feed(food)
+    run(3.2)
+    check(pet.state != "eat" and pet.state != "drink" and pet.held is None, f"come/bebe '{food}'")
+
+
+def drink(potion: str) -> None:
+    pet.needs.values["sede"] = 40
+    pet.set_state("idle", dur=999)
+    pet.feed(potion)
+    run(2.6)
+
+
+stock = prog.inventory["pocao_salto"]
+drink("pocao_salto")
+check(prog.inventory["pocao_salto"] == stock - 1 and pet.needs.has("salto"), "poção de salto gasta do estoque")
+highest = 0.0
+for _ in range(400):
+    run(0.033)
+    highest = max(highest, pet.jump)
+    if pet.jump > pet.sprite_h * 0.8:
+        shot("salto", hover=False)
+check(highest > pet.sprite_h * 0.8, "poção de salto: pulos altíssimos")
+pet.needs.effects.pop("salto", None)
+run(1)
+
+drink("pocao_encolher")
+run(2)
+check(abs(pet.size - 0.5) < 0.02, "poção de encolher deixa ele pequeno")
+shot("encolhido")
+pet.needs.effects["encolhido"] = time.time() - 1
+run(2)
+check(pet.size == 1.0 and "cresce" in sounds, "volta ao tamanho normal quando o efeito acaba")
+
+drink("pocao_invisibilidade")
+check(pet.ghost, "poção de invisibilidade")
+shot("invisivel")
+pet.needs.effects.pop("invisivel", None)
+
+pet.needs.sulk(600)
+drink("pocao_cura")
+check(not pet.needs.sulking(), "poção de cura tira o emburrado")
+
+seen_props: dict[str, set] = {}
+for act in ("minerar", "pescar", "plantar", "porco", "fogos"):
+    pet.needs.values["energia"] = 90
+    pet.set_state("idle", dur=999)
+    pet.do_activity(act)
+    kinds = seen_props.setdefault(act, set())
+    for step in range(int(32 / 0.033)):
+        pet.update(0.033)
+        win.frame()
+        kinds.update(f"{p.kind}:{p.name}" for p in pet.props)
+        if step == int(7 / 0.033):
+            shot(f"atividade_{act}", hover=False)
+        if pet.state != "exercise":
+            break
+    check(pet.state != "exercise" and not pet.props and pet.tool is None and pet.jump == 0,
+          f"atividade '{act}' termina e limpa a cena")
+check(any(k.startswith("icon:bloco_") for k in seen_props["minerar"]) and prog.counters.get("blocos", 0) >= 1,
+      "minerar quebra blocos")
+check({"water:", "line:"} <= seen_props["pescar"] and "splash" in sounds, "pescar com poça, linha e boia")
+check("icon:flor" in seen_props["plantar"] and "cavar" in sounds, "plantar cava e a flor cresce")
+check(any(k.startswith("big:porco") for k in seen_props["porco"]) and "cavaleiro_suino" in prog.done,
+      "porco aparece e dá conquista")
+check("estouro" in sounds and "foguete" in sounds, "fogos sobem e estouram")
+
 for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
-             "carinho", "tonto", "xp", "nivel", "conquista"):
+             "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe"):
     check(name in sounds, f"som '{name}' tocou")
 check(any(n.startswith("nota_") for n in sounds), "dançar toca notas")
 

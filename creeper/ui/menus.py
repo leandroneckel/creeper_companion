@@ -55,6 +55,8 @@ def effects_text(item: dict) -> str:
         parts.append(f"fica {EFFECT_LABELS.get(item['status'], item['status'])}")
     if item.get("cura"):
         parts.append("cura enjoo e café")
+    if item.get("desemburra"):
+        parts.append("tira o emburrado")
     return " · ".join(parts)
 
 

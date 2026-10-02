@@ -32,6 +32,9 @@ EFFECTS = {
     "cafeinado": 20 * 60,
     "velocidade": 3 * 60,
     "chamuscado": 10 * 60,
+    "salto": 3 * 60,
+    "encolhido": 3 * 60,
+    "invisivel": 2 * 60,
 }
 BAD_EFFECTS = {"enjoado", "cafeinado"}
 EFFECT_LABELS = {
@@ -40,6 +43,9 @@ EFFECT_LABELS = {
     "cafeinado": "cafeinado",
     "velocidade": "veloz",
     "chamuscado": "chamuscado",
+    "salto": "saltitante",
+    "encolhido": "encolhido",
+    "invisivel": "invisível",
 }
 
 # Taxas em pontos por hora (com velocidade 1.0).

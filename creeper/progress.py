@@ -154,19 +154,28 @@ class Progress:
         self.inventory[item["id"]] = left - 1
         return True
 
+    def random_special(self) -> dict | None:
+        """Sorteia um item limitado já desbloqueado (pelo peso de cada um)."""
+        pool = [i for i in self.items.limited() if self.unlocked(i)]
+        if not pool:
+            return None
+        return random.choices(pool, weights=[float(i["limitado"].get("peso", 1)) for i in pool])[0]
+
+    def give(self, item_id: str, qty: int = 1) -> None:
+        self.inventory[item_id] = self.inventory.get(item_id, 0) + qty
+
     def open_present(self) -> tuple[str, int] | None:
         """Abre um presente: ("xp", quantidade) ou (id do item, quantidade)."""
         if self.presents <= 0:
             return None
         self.presents -= 1
-        pool = [i for i in self.items.limited() if self.unlocked(i)]
-        if not pool or random.random() < PRESENT_XP_CHANCE:
+        item = self.random_special()
+        if item is None or random.random() < PRESENT_XP_CHANCE:
             result = ("xp", PRESENT_XP)
             self.add_xp(PRESENT_XP)
         else:
-            item = random.choices(pool, weights=[float(i["limitado"].get("peso", 1)) for i in pool])[0]
             qty = int(item["limitado"].get("presente", 1))
-            self.inventory[item["id"]] = self.inventory.get(item["id"], 0) + qty
+            self.give(item["id"], qty)
             result = (item["id"], qty)
         self.bump("presentes")
         return result

@@ -425,6 +425,79 @@ def fanfare(rng) -> list:
     return add_at(out, partials(2093.0, 0.8, 0.3, GLOCK), 0.3, 0.25)
 
 
+def pick_hit(rng, center: float) -> list:
+    """Picareta na pedra: estalo seco com um baque."""
+    dur = 0.14
+    click = mul(svf(noise(dur, rng), center, 2.5, "band"), decay_env(dur, 0.001, 0.018))
+    thunk = mul(osc(dur, lambda u: 260 - 120 * u, "tri"), decay_env(dur, 0.002, 0.03))
+    return [a + 0.5 * b for a, b in zip(click, thunk)]
+
+
+def crumble(rng) -> list:
+    """Bloco quebrando: pedrinhas caindo."""
+    out = [0.0] * _len(0.4)
+    for i in range(9):
+        burst = svf(noise(0.06, rng), rng.uniform(700, 2200), 1.2, "band")
+        add_at(out, mul(burst, decay_env(0.06, 0.001, 0.015)), i * 0.035 + rng.uniform(0, 0.02), 1 - i * 0.08)
+    return out
+
+
+def splash(rng) -> list:
+    """Água: chuá que vai abafando, com bolhinhas."""
+    dur = 0.55
+    body = svf(noise(dur, rng), lambda u: 4000 - 2500 * u, 0.8, "low")
+    out = mul(svf(body, 300, 0.7, "high"), decay_env(dur, 0.005, 0.12))
+    for _ in range(6):
+        f0 = rng.uniform(500, 900)
+        bubble = mul(osc(0.06, lambda u, f0=f0: f0 * (1 + 1.2 * u)), decay_env(0.06, 0.003, 0.015))
+        add_at(out, bubble, rng.uniform(0.05, 0.4), 0.25)
+    return out
+
+
+def oink(rng, f0: float) -> list:
+    """Porco: dois grunhidos anasalados."""
+    def grunt(dur: float, f: float) -> list:
+        src = osc(dur, lambda u: f * (1 - 0.2 * u), "saw")
+        a = svf(src, 700, 5, "band")
+        b = svf(src, 1600, 6, "band")
+        return mul([x + 0.5 * y for x, y in zip(a, b)], ar_env(dur, 0.015, 0.05))
+
+    out = grunt(0.12, f0)
+    return add_at(out, grunt(0.16, f0 * 0.9), 0.17)
+
+
+def whoosh(rng) -> list:
+    """Foguete subindo: chiado que sobe de tom."""
+    dur = 0.7
+    return mul(svf(noise(dur, rng), lambda u: 600 + 3500 * u, 3, "band"), ar_env(dur, 0.15, 0.25))
+
+
+def firework(rng) -> list:
+    """Fogos: estampido curto e estalinhos se espalhando."""
+    out = mul(svf(noise(0.25, rng), 1200, 0.7, "low"), decay_env(0.25, 0.001, 0.05))
+    out += [0.0] * (_len(1.0) - len(out))
+    for _ in range(30):
+        start = rng.uniform(0.1, 0.9)
+        tick = svf(noise(0.004, rng), 3000, 0.7, "high")
+        add_at(out, mul(tick, decay_env(0.004, 0.0005, 0.0012)), start, 0.5 * (1.1 - start))
+    return out[:_len(1.0)]
+
+
+def slide(rng, f_from: float, f_to: float) -> list:
+    """Encolher/crescer: 'uííp' deslizando de tom."""
+    dur = 0.5
+    s = osc(dur, lambda u: f_from * (f_to / f_from) ** u, "tri", vibrato=0.04, vib_rate=14)
+    return mul(s, ar_env(dur, 0.02, 0.15))
+
+
+def dig(rng) -> list:
+    """Cavar: baque abafado de terra."""
+    dur = 0.16
+    s = svf(noise(dur, rng), 700, 0.9, "low")
+    s = [v if rng.random() < 0.7 else v * 0.3 for v in s]
+    return mul(s, decay_env(dur, 0.002, 0.04))
+
+
 # nome -> (gerador, volume alvo em dB). Nomes com sufixo _N são variações do mesmo som
 # (o player sorteia entre elas), exceto as notas, que o creeper escolhe uma por uma.
 SOUNDS = {
@@ -452,6 +525,18 @@ SOUNDS = {
     "xp_3": (lambda rng: orb(rng, 2093.0), -24),
     "nivel": (level_up, -16),
     "conquista": (fanfare, -16),
+    "picareta_1": (lambda rng: pick_hit(rng, 2400), -19),
+    "picareta_2": (lambda rng: pick_hit(rng, 2900), -19),
+    "quebra": (crumble, -18),
+    "splash": (splash, -18),
+    "oinc_1": (lambda rng: oink(rng, 190), -17),
+    "oinc_2": (lambda rng: oink(rng, 165), -17),
+    "foguete": (whoosh, -21),
+    "estouro_1": (firework, -16),
+    "estouro_2": (firework, -16),
+    "encolhe": (lambda rng: slide(rng, 900, 250), -19),
+    "cresce": (lambda rng: slide(rng, 250, 900), -19),
+    "cavar": (dig, -20),
 }
 
 
