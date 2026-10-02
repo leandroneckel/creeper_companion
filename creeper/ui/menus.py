@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QProxyStyle, QStyle
 
-from .. import cosmetics, tricks
+from .. import __version__, cosmetics, tricks
 from ..art import icons, sprite
 from ..art.sprite import Pose
 from ..needs import EFFECT_LABELS, LABELS
@@ -121,7 +121,10 @@ def fill_main(app, menu: QMenu, tray: bool = False) -> None:
         act = menu.addAction(_icon("presente"), "Abrir presente" + (f" ({prog.presents})" if prog.presents > 1 else ""))
         act.setEnabled(not pet.hidden and not app.in_tray)   # abre na tela, pra você ver o que veio
         act.triggered.connect(app.open_present)
-    if care or prog.presents:
+    if app.update_offer:
+        act = menu.addAction(_icon("faisca"), f"Atualizar para a versão {app.update_offer.version}")
+        act.triggered.connect(app.open_update)
+    if care or prog.presents or app.update_offer:
         menu.addSeparator()
 
     for category in ("comidas", "bebidas", "atividades"):
@@ -295,6 +298,10 @@ def _fill_settings(app, menu: QMenu) -> None:
     _check(menu, "Avisos quando estiver na bandeja", s.notifications,
            lambda v: app.set_setting("notifications", v))
     _check(menu, "Iniciar com o sistema", app.autostart_enabled(), app.set_autostart)
+    menu.addSeparator()
+    _check(menu, "Avisar quando sair versão nova", s.check_updates, lambda v: app.set_setting("check_updates", v))
+    act = menu.addAction(f"Procurar versão nova (esta é a {__version__})")
+    act.triggered.connect(app.check_update_now)
     menu.addSeparator()
     act = menu.addAction("Renomear...")
     act.triggered.connect(app.rename)

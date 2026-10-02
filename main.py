@@ -33,6 +33,7 @@ def main() -> int:
 
     from creeper.app import CompanionApp
     companion = CompanionApp(qapp)
+    companion.instance_server = server
 
     def on_connection():
         conn = server.nextPendingConnection()

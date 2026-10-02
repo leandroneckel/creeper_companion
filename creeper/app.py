@@ -6,7 +6,7 @@ from PySide6.QtCore import QElapsedTimer, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QCursor, QGuiApplication
 from PySide6.QtWidgets import QInputDialog, QMenu, QSystemTrayIcon
 
-from . import desktop, surfaces
+from . import __version__, desktop, surfaces, updater
 from .ball import Ball
 from .config import Settings, load_save, write_save
 from .content import load_content
@@ -19,9 +19,11 @@ from .ui.pet_window import PetWindow
 from .ui.ball_window import BallWindow
 from .ui.toast import Toast
 from .ui.tray import Tray
+from .ui.update_dialog import UpdateDialog
 
 FRAME_MS = 33
 CARE_CONFIRM_SECONDS = 10 * 60   # quanto tempo dá pra apertar "Fiz!" depois de um lembrete
+UPDATE_SNOOZE_SECONDS = 24 * 3600   # "agora não": pergunta de novo no dia seguinte
 CARE_REMINDERS = {"lembrete_agua": "agua", "lembrete_pausa": "pausa"}
 
 
@@ -44,6 +46,7 @@ class CompanionApp(QObject):
 
         save = load_save()
         self.first_run = not save
+        self.prev_version = save.get("app_version")   # versão que salvou da última vez
         self.settings = Settings.from_dict(save.get("settings"))
         self.items, self.lines, self.achievements = load_content()
         pet_data = save.get("pet") or {}
@@ -66,6 +69,18 @@ class CompanionApp(QObject):
         self._popup: QMenu | None = None
         self._last_notify = -1e9
         self._tray_hint_shown = False
+        self._tray_click = None   # o que fazer se clicarem no último aviso da bandeja
+
+        self.instance_server = None   # main.py preenche: é fechado antes de abrir a versão nova
+        self.update_offer: updater.Release | None = None
+        self._update_announce = False
+        self._update_snooze_until = 0.0
+        self._update_dialog: UpdateDialog | None = None
+        self.updater = updater.Updater(self.on_update_result, self)
+        updater.cleanup()
+        QTimer.singleShot(15000, lambda: updater.cleanup(partial=False))   # o antigo pode demorar a fechar
+        if self.settings.check_updates:
+            self.updater.start()
 
         self.sounds = Sounds(self.settings, self)
         self.pet.sfx = self.play_sound
@@ -79,6 +94,7 @@ class CompanionApp(QObject):
         self.pet.ball = self.ball
         self.ball_window = BallWindow(self.ball, self.on_ball_thrown)
         self.tray = Tray(self)
+        self.tray.messageClicked.connect(self._on_tray_message)
         self.tray.show()
 
         now = time.monotonic()
@@ -314,7 +330,7 @@ class CompanionApp(QObject):
                 self.toast.show_achievement(ach, self.window.screen())
                 self.play_sound("conquista")
             elif self.settings.notifications:
-                self.tray.showMessage("Conquista feita!", ach["nome"], self.tray.icon(), 6000)
+                self.notify("Conquista feita!", ach["nome"], 6000)
 
     # ---- fala e sons -----------------------------------------------------
     def play_sound(self, name: str, volume: float = 1.0) -> None:
@@ -336,12 +352,31 @@ class CompanionApp(QObject):
             now = time.monotonic()
             if kind == "reminder" or now - self._last_notify > 600:
                 self._last_notify = now
-                self.tray.showMessage(self.settings.name, text, self.tray.icon(), 7000)
+                self.notify(self.settings.name, text, 7000)
+
+    def notify(self, title: str, text: str, ms: int = 7000, on_click=None) -> None:
+        """Aviso da bandeja do sistema; `on_click` roda se clicarem nele."""
+        self._tray_click = on_click
+        self.tray.showMessage(title, text, self.tray.icon(), ms)
+
+    def _on_tray_message(self) -> None:
+        click, self._tray_click = self._tray_click, None
+        if click:
+            click()
+
+    def tell(self, text: str) -> None:
+        """Resposta a algo que você pediu: no balão, ou na bandeja se ele estiver lá."""
+        if self.window.isVisible():
+            self.window.show_bubble(text)
+        else:
+            self.notify(self.settings.name, text, 6000)
 
     def greet(self) -> None:
         pet = self.pet
         if self.first_run:
             pet.line("primeira_vez")
+        elif self.prev_version and updater.newer(__version__, self.prev_version):
+            pet.line("atualizado", versao=__version__)
         elif self.away > 24 * 3600:
             pet.line("voltou_longe", tempo=format_elapsed(self.away))
         elif self.away > 4 * 3600 or self.away < 60:
@@ -361,6 +396,7 @@ class CompanionApp(QObject):
         elif not should and self.window.isVisible():
             self.window.hide()
         self._flush_achievements()   # conquistas que esperaram a tela cheia acabar
+        self._announce_update()
 
     def toggle_visible(self) -> None:
         if self.in_tray:
@@ -379,8 +415,7 @@ class CompanionApp(QObject):
         QTimer.singleShot(1300, self.apply_visibility)
         if not self._tray_hint_shown:
             self._tray_hint_shown = True
-            self.tray.showMessage(self.settings.name, "Tô aqui na bandeja! Clica no meu ícone pra me trazer de volta.",
-                                  self.tray.icon(), 5000)
+            self.notify(self.settings.name, "Tô aqui na bandeja! Clica no meu ícone pra me trazer de volta.", 5000)
         self.save()
 
     def show_from_tray(self) -> None:
@@ -446,6 +481,11 @@ class CompanionApp(QObject):
             self.play_sound("pop")  # amostra do volume escolhido
         if key == "climb":
             self.refresh_platforms()   # desligou: ele desce da janela na hora
+        if key == "check_updates":
+            if value:
+                self.updater.start()
+            else:
+                self.updater.stop()
         self.save()
 
     def autostart_enabled(self) -> bool:
@@ -467,6 +507,84 @@ class CompanionApp(QObject):
             self.settings.name = name
             self.pet.line("renomeado")
             self.save()
+
+    # ---- versão nova ----------------------------------------------------
+    def on_update_result(self, release: updater.Release | None, error: str, manual: bool) -> None:
+        if release:
+            self.update_offer = release
+        if manual:   # você pediu pra procurar: sempre responde
+            if release:
+                self.open_update()
+            elif error:
+                self.tell(self.lines.pick("versao_sem_internet", nome=self.settings.name)
+                          or "Não consegui ver se tem versão nova.")
+            else:
+                self.tell(self.lines.pick("versao_em_dia", nome=self.settings.name, versao=__version__)
+                          or f"Já tô na versão mais nova ({__version__}).")
+        elif (release and release.version != self.settings.skip_version
+              and time.monotonic() >= self._update_snooze_until):
+            self._update_announce = True
+            self._announce_update()
+
+    def _announce_update(self) -> None:
+        """Conta da versão nova: no balão (com botão "Ver") ou num aviso da bandeja."""
+        if not self._update_announce or not self.update_offer or self.fs_hidden:
+            return   # em tela cheia, espera o jogo/vídeo acabar
+        self._update_announce = False
+        version = self.update_offer.version
+        if self.window.isVisible():
+            text = (self.lines.pick("versao_nova", nome=self.settings.name, versao=version)
+                    or f"Saiu a versão {version}! Quer ver?")
+            self.window.show_bubble(text, action="atualizar")
+            self.play_sound("lembrete")
+        elif self.settings.notifications:
+            self.notify(f"{self.settings.name} tem versão nova",
+                        f"Saiu a versão {version}. Clique aqui pra ver o que mudou.", 10000, self.open_update)
+
+    def open_update(self) -> None:
+        if not self.update_offer:
+            return
+        if self.window.sticky and self.window.sticky[1] == "atualizar":
+            self.window.clear_sticky()
+        if self._update_dialog and self._update_dialog.isVisible():
+            self._update_dialog.raise_()
+            self._update_dialog.activateWindow()
+            return
+        self._update_dialog = UpdateDialog(self, self.update_offer)
+        self._update_dialog.show()
+
+    def check_update_now(self) -> None:
+        self.updater.check(manual=True)
+
+    def skip_update(self, release: updater.Release) -> None:
+        self.settings.skip_version = release.version
+        self.save()
+
+    def snooze_update(self) -> None:
+        # não oferece de novo sozinho por um dia (no menu continua)
+        self._update_snooze_until = time.monotonic() + UPDATE_SNOOZE_SECONDS
+
+    def finish_update(self, new_file) -> str:
+        """Troca o executável pelo novo e reabre. Dando certo, este fecha; senão devolve o erro."""
+        target = updater.target_file()
+        try:
+            updater.install(new_file, target)
+        except OSError as exc:
+            updater.cleanup(target)
+            return f"não consegui trocar o programa ({exc.strerror or exc})"
+        self.save()
+        server = self.instance_server
+        name = server.serverName() if server else ""
+        if server:
+            server.close()   # libera a vaga de "uma cópia só" pra versão nova
+        try:
+            updater.relaunch(target)
+        except OSError as exc:
+            if server:
+                server.listen(name)
+            return f"a versão nova já está no lugar, mas não abriu ({exc.strerror or exc}); feche e abra de novo"
+        self.quit()
+        return ""
 
     def save(self) -> None:
         try:

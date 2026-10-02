@@ -9,7 +9,12 @@ Funciona no **Windows** e no **Linux** (GNOME incluído).
 
 ## Como abrir
 
-- **Windows:** dois cliques em `iniciar_windows.bat`. Na primeira vez ele cria o ambiente e instala as dependências.
+- **Windows (mais fácil):** baixe o `CreeperCompanion.exe` da
+  [última versão](https://github.com/leandroneckel/creeper_companion/releases/latest) e abra. Não precisa instalar
+  nada. Deixe o arquivo numa pasta sua (por exemplo `Documentos\Creeper`), porque é ali que ele se atualiza.
+  Na primeira vez o Windows pode dizer que o editor é desconhecido: clique em **Mais informações → Executar assim mesmo**.
+- **Windows, pelo código:** dois cliques em `iniciar_windows.bat`. Na primeira vez ele cria o ambiente e instala
+  as dependências.
 - **Linux:** `./iniciar_linux.sh`
 
 Ou, manualmente:
@@ -130,6 +135,28 @@ Ele chia antes de explodir (no ritmo do pisca-pisca), mastiga, dá goles, às ve
 - Só faz barulho quando está na tela: na bandeja ou escondido por tela cheia, fica quieto.
 - Pra ouvir todos os sons em sequência: `python tools/preview_sounds.py` (ou `... pop miau` pra só alguns).
 
+## Versões novas
+
+Quando sai uma versão nova, o creeper avisa num balão (ou num aviso da bandeja) e mostra o que mudou. Aí dá pra
+**atualizar agora** (ele baixa, confere e reabre sozinho em poucos segundos), deixar pra **depois** ou **pular
+aquela versão**. Nível, itens e o resto do progresso ficam salvos à parte e continuam iguais.
+
+- Ele procura 1 minuto depois de abrir e depois a cada 6 horas. Também dá pra procurar na hora ou desligar o
+  aviso em **Configurações**.
+- Rodando pelo código-fonte ele só avisa; pra atualizar, `git pull`.
+
+### Publicar uma versão (pra quem mantém o projeto)
+
+```bash
+pip install -r requirements-dev.txt   # PyInstaller
+gh auth login                          # GitHub CLI, uma vez só
+python tools/release.py 1.2.0          # gera o .exe, cria a tag v1.2.0 e a release com ele anexado
+```
+
+O script confere que o git está limpo e em dia, mostra as notas (por padrão, os títulos dos commits desde a
+última versão; ou use `--notas "..."`) e pergunta antes de publicar. Pra só gerar o executável e testar:
+`python tools/build_exe.py` (sai em `dist/`).
+
 ## Áreas de trabalho virtuais
 
 - **Windows:** a janela é do tipo "tool window". O Windows não a associa a nenhuma área de trabalho
@@ -173,6 +200,7 @@ creeper/
   surfaces.py           janelas abertas viram lugares pra subir e se esconder
   ball.py               física da bolinha
   config.py             configurações e salvamento
+  updater.py            versão nova: consulta o GitHub, baixa, confere e troca o executável
   content.py            leitura dos YAML
   art/sprite.py         o creeper em pixel art (gerado por código) e suas expressões
   art/icons.py          ícones 12x12 dos itens e das barras de status
@@ -183,12 +211,15 @@ creeper/
   ui/toast.py           aviso "Conquista feita!" no canto da tela
   ui/ball_window.py     a bolinha na tela (dá pra agarrar e arremessar)
   ui/tray.py            ícone da bandeja
+  ui/update_dialog.py   janela "versão nova" (o que mudou; atualizar, depois, pular)
   desktop/              integração com o sistema (Windows / Linux)
 content/                itens e falas (YAML)
 tools/smoke_test.py     teste automático sem tela (python tools/smoke_test.py)
 tools/preview_sprites.py  gera uma folha com todas as expressões e ícones
 tools/preview_sounds.py   toca os sons um por um (ou salva os WAV)
 tools/readme_image.py   gera a imagem do README (docs/creeper-companion.png)
+tools/build_exe.py      gera o executável com o PyInstaller (dist/)
+tools/release.py        publica uma versão: executável + tag + release no GitHub
 ```
 
 ## Licença
@@ -203,5 +234,7 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 ## Próximos passos
 
-- Executável único (`.exe` no Windows, AppImage no Linux).
+- Executável para Linux: o atualizador já sabe trocar um `CreeperCompanion-linux` anexado à release, falta gerar
+  e testar numa máquina Linux.
+- Assinar o `.exe` (tira o aviso de "editor desconhecido" do Windows; o certificado é pago).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).

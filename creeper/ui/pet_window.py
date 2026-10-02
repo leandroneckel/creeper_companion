@@ -23,7 +23,8 @@ BUTTONS = [
 WIDTH = 270
 STATUS_W = 214
 BUBBLE_MAX_W = 236
-STICKY_SECONDS = 90   # quanto tempo o balão do lembrete com "Fiz!" fica voltando
+STICKY_SECONDS = 90   # quanto tempo o balão com botão ("Fiz!", "Ver") fica voltando
+STICKY_BUTTONS = {"atualizar": "Ver"}   # o resto (lembretes de água e pausa) é "Fiz!"
 
 TOOLTIP_BG = QColor(18, 4, 22, 238)
 TOOLTIP_BORDER = QColor("#4B2A86")
@@ -53,7 +54,7 @@ class PetWindow(QWidget):
 
         self.bubble_text: str | None = None
         self.bubble_until = 0.0
-        self.sticky: tuple[str, str, float] | None = None   # lembrete com "Fiz!": (texto, tipo, até quando)
+        self.sticky: tuple[str, str, float] | None = None   # balão com botão: (texto, tipo, até quando)
         self.bubble_btn: QRect | None = None
         self.hover_since: float | None = None
         self.hover_lost: float | None = None
@@ -213,8 +214,8 @@ class PetWindow(QWidget):
                 self._occluder_rect().getRect() if pet.occluder else None)
 
     def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
-        """Mostra uma fala. Com `action` ("agua"/"pausa"), o balão ganha o botão "Fiz!" e volta
-        se outra fala o cobrir."""
+        """Mostra uma fala. Com `action` ("agua"/"pausa": "Fiz!"; "atualizar": "Ver"), o balão ganha
+        um botão e volta se outra fala o cobrir."""
         self.bubble_text = text
         if action:
             self.sticky = (text, action, time.monotonic() + STICKY_SECONDS)
@@ -635,9 +636,10 @@ class PetWindow(QWidget):
             self._bevel(p, btn, QColor("#7FB04A"), QColor("#B5E07A"), QColor("#3E6B1E"))
             p.setFont(self.font_title)
             p.setPen(QColor("#1E3A0C"))
-            p.drawText(btn.translated(1, 1), Qt.AlignCenter, "Fiz!")
+            label = STICKY_BUTTONS.get(self.sticky[1], "Fiz!")
+            p.drawText(btn.translated(1, 1), Qt.AlignCenter, label)
             p.setPen(white)
-            p.drawText(btn, Qt.AlignCenter, "Fiz!")
+            p.drawText(btn, Qt.AlignCenter, label)
 
     # ---- mouse -----------------------------------------------------------
     def _button_at(self, pos: QPoint) -> str | None:
@@ -656,7 +658,10 @@ class PetWindow(QWidget):
         gpos = e.globalPosition().toPoint()
         if e.button() == Qt.LeftButton:
             if self.bubble_text and self.bubble_btn and self.bubble_btn.contains(pos):
-                self.app.confirm_care()
+                if self.sticky and self.sticky[1] == "atualizar":
+                    self.app.open_update()
+                else:
+                    self.app.confirm_care()
                 return
             gift = self.gift_rect()
             if gift and gift.adjusted(-3, -3, 3, 3).contains(pos):

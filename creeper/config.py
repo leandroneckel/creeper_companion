@@ -6,6 +6,8 @@ import time
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
+from . import __version__
+
 APP_NAME = "CreeperCompanion"
 
 
@@ -53,6 +55,9 @@ class Settings:
     # comportamentos (só valem depois de desbloqueados)
     solo_play: bool = True         # brinca sozinho quando está feliz
     climb: bool = True             # sobe nas janelas abertas
+    # versão nova
+    check_updates: bool = True     # procura sozinho de tempos em tempos
+    skip_version: str = ""         # "pular esta versão": não oferece essa de novo sozinho
 
     @classmethod
     def from_dict(cls, data: dict) -> "Settings":
@@ -71,6 +76,7 @@ def load_save() -> dict:
 def write_save(settings: Settings, pet: dict, window: dict) -> None:
     payload = {
         "version": 1,
+        "app_version": __version__,
         "saved_at": time.time(),
         "settings": asdict(settings),
         "pet": pet,

@@ -28,6 +28,7 @@ SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 else None
 app = CompanionApp(qapp)
 for timer in app._timers:
     timer.stop()
+app.updater.stop()   # nada de internet no teste
 pet, win = app.pet, app.window
 said: list[tuple[str, str]] = []
 pet.say = lambda text, kind="chat": (said.append((kind, text)), app.on_say(text, kind))
@@ -545,9 +546,87 @@ for name in synth.SOUNDS:
         bad.append(name)
 check(not bad, f"{len(synth.SOUNDS)} sons gerados sem estourar nem estalar" + (f": {bad}" if bad else ""))
 
+# ---- versão nova --------------------------------------------------------------
+from creeper import __version__, updater  # noqa: E402
+
+check(updater.newer("v1.10.0", "1.9.3") and not updater.newer("1.2", "1.2.0") and updater.newer("2", "1.99.9")
+      and updater.parse_version("lixo") == (0, 0, 0), "compara versões")
+fake = {"tag_name": "v99.0.0", "body": "- **Novo:** ele aprendeu a nadar\n- Correções", "html_url": "https://x/v99",
+        "assets": [{"name": "CreeperCompanion.exe", "browser_download_url": "https://x/a.exe", "size": 123,
+                    "digest": "sha256:ABC123"},
+                   {"name": "CreeperCompanion-linux", "browser_download_url": "https://x/b", "size": 456}]}
+rel = updater.parse_release(fake, "win32")
+check(rel.version == "99.0.0" and rel.size == 123 and rel.sha256 == "abc123" and rel.url == "https://x/a.exe",
+      "lê a release do GitHub (arquivo do sistema e SHA-256)")
+check(updater.parse_release(fake, "linux").sha256 is None and updater.parse_release(fake, "darwin").url is None
+      and updater.parse_release(dict(fake, prerelease=True)) is None, "sem arquivo pro sistema / pré-release")
+check(updater.target_file() is None and not updater.can_self_update(rel), "pelo código-fonte só avisa")
+
+upd_dir = Path(tempfile.mkdtemp(prefix="creeper-upd-"))
+exe = upd_dir / "CreeperCompanion.exe"
+exe.write_bytes(b"MZ velho")
+(upd_dir / "CreeperCompanion.exe.new").write_bytes(b"MZ novo")
+updater.install(upd_dir / "CreeperCompanion.exe.new", exe)
+check(exe.read_bytes() == b"MZ novo" and not (upd_dir / "CreeperCompanion.exe.new").exists(),
+      "troca o executável pelo novo")
+updater.cleanup(exe)
+check([f.name for f in upd_dir.iterdir()] == ["CreeperCompanion.exe"], "apaga as sobras da atualização")
+
+pet.set_state("idle", dur=999)
+win.bubble_text, win.sticky = None, None
+app.on_update_result(rel, "", False)
+win.frame()
+check(bool(win.sticky) and win.sticky[1] == "atualizar" and "99.0.0" in (win.bubble_text or "")
+      and sounds[-1] == "lembrete", "conta da versão nova no balão")
+win.grab()   # desenha (e posiciona o botão do balão)
+shot("versao_nova", hover=False)
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+check(any(a.text() == "Atualizar para a versão 99.0.0" for a in main_menu.actions()), "item de atualizar no menu")
+settings_menu = next(a.menu() for a in main_menu.actions() if a.text() == "Configurações")
+check(any(__version__ in a.text() for a in settings_menu.actions()), "configurações mostram a versão")
+QTest.mouseClick(win, Qt.LeftButton, Qt.NoModifier, win.bubble_btn.center())
+dlg = app._update_dialog
+check(dlg is not None and dlg.isVisible() and win.sticky is None, "botão Ver abre a janela da versão nova")
+if SHOTS:
+    dlg.grab().save(str(SHOTS / "janela_versao_nova.png"))
+check(dlg.go_btn.text() == "Abrir página da versão", "pelo código-fonte a janela manda pra página")
+dlg.reject()
+app.on_update_result(rel, "", False)
+check(app._update_snooze_until > time.monotonic() + 23 * 3600 and win.sticky is None,
+      "agora não: só oferece de novo no dia seguinte")
+app._update_snooze_until = 0.0
+app.open_update()
+app._update_dialog._skip()
+app.on_update_result(rel, "", False)
+check(app.settings.skip_version == "99.0.0" and win.sticky is None, "versão pulada não é oferecida de novo")
+
+app.on_update_result(None, "", True)
+check(__version__ in (win.bubble_text or ""), "procurar na mão: avisa que está em dia")
+app.on_update_result(None, "Host not found", True)
+check("internet" in (win.bubble_text or ""), "procurar na mão: avisa quando não deu")
+
+app.settings.skip_version = ""
+app.in_tray = True
+app.apply_visibility()
+app.on_update_result(rel, "", False)
+check(app._tray_click == app.open_update, "na bandeja: aviso do sistema")
+app._update_dialog = None
+app._on_tray_message()
+check(app._update_dialog is not None and app._update_dialog.isVisible(), "clicar no aviso abre a janela")
+app._update_dialog.hide()
+app.in_tray = False
+app.apply_visibility()
+
+app.first_run, app.prev_version = False, "0.9.0"
+app.greet()
+check(__version__ in said[-1][1], "conta que foi atualizado ao abrir a versão nova")
+
 app.save()
 check((Path(TMP) / "CreeperCompanion" / "save.json").exists()
       or (Path(TMP) / "creeper-companion" / "save.json").exists(), "salva o estado")
+save_path = next(Path(TMP).glob("*/save.json"))
+check(json.loads(save_path.read_text(encoding="utf-8")).get("app_version") == __version__, "salva a versão do programa")
 
 print("\n--- falas ---")
 for kind, text in said:

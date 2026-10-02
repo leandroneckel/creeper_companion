@@ -11,6 +11,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, QUrl
 
+from .. import __version__
 from ..config import data_dir
 from . import synth
 
@@ -27,7 +28,7 @@ def _cache_dir() -> Path:
     try:
         key = hashlib.sha1(Path(synth.__file__).read_bytes()).hexdigest()[:10]
     except OSError:
-        key = "padrao"
+        key = "v" + __version__   # no executável não tem o .py: cada versão gera os seus
     root = data_dir() / "sons"
     for old in root.glob("*"):
         if old.name != key:
