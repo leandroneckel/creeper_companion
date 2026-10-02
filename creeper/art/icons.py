@@ -183,6 +183,7 @@ ICONS: dict[str, tuple[list[str], dict[str, str]]] = {
     ], {"r": "#A1574A", "g": "#6B8E23"}),
     # ---- bebidas ----
     "agua": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#3F76E4", "h": "#9EC1FF", "D": "#2A55B0"}),
+    "cerveja": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#FFC107", "h": "#FFECB3", "D": "#FF9800"}),
     "pocao_velocidade": (_BOTTLE, {"c": "#8D6E63", "w": "#CFD8DC", "L": "#7CC7E8", "h": "#E1F5FE", "D": "#4FA3C7"}),
     "leite": ([
         "............",

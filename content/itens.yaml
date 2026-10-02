@@ -86,6 +86,9 @@ bebidas:
   - id: suco
     nome: Suco de melancia
     efeitos: {sede: 28, diversao: 5}
+  - id: cerveja
+    nome: Cerveja
+    efeitos: {sede: 10, diversao: 15}
   - id: leite
     nome: Leite
     efeitos: {sede: 25, fome: 5}
