@@ -22,6 +22,9 @@ REPO = "leandroneckel/creeper_companion"
 # CREEPER_UPDATE_URL troca o endereço (pra testar com um servidor local, um fork...)
 LATEST_URL = os.environ.get("CREEPER_UPDATE_URL") or f"https://api.github.com/repos/{REPO}/releases/latest"
 ASSET_NAMES = {"win32": "CreeperCompanion.exe", "linux": "CreeperCompanion-linux"}
+# AppId do instalador (tools/instalador.iss): é por ele que o Windows reconhece o programa instalado. Nunca mude.
+INSTALLER_GUID = "1160637A-01BF-4016-BE32-549DEE0D367C"
+UNINSTALL_KEY = rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{{{INSTALLER_GUID}}}_is1"
 FIRST_CHECK_MS = 60 * 1000        # deixa ele abrir em paz antes de olhar
 CHECK_EVERY_MS = 6 * 3600 * 1000
 TIMEOUT_MS = 30 * 1000            # sem chegar nada por esse tempo, desiste
@@ -112,6 +115,41 @@ def cleanup(target: Path | None = None, partial: bool = True) -> None:
             path.unlink(missing_ok=True)
         except OSError:
             pass   # o antigo ainda está fechando: fica pra próxima
+
+
+INSTALLER_CHOICE = (r"Software\CreeperCompanion", "AvisarVersaoNova")   # gravado pelo instalador
+
+
+def take_installer_choice() -> bool | None:
+    """O que marcaram no instalador em "Avisar quando sair versão nova" (lê e apaga: vale uma vez,
+    depois manda o que estiver em Configurações). None se não veio do instalador."""
+    if sys.platform != "win32":
+        return None
+    import winreg
+    key_path, name = INSTALLER_CHOICE
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0,
+                            winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE) as key:
+            value = winreg.QueryValueEx(key, name)[0]
+            winreg.DeleteValue(key, name)
+            return bool(value)
+    except OSError:
+        return None
+
+
+def sync_installed_version() -> None:
+    """Se veio do instalador, corrige a versão que aparece em "Aplicativos instalados" (o instalador
+    gravou a dele; as atualizações seguintes trocam só o executável)."""
+    if sys.platform != "win32" or target_file() is None:
+        return
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY, 0,
+                            winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE) as key:
+            if winreg.QueryValueEx(key, "DisplayVersion")[0] != __version__:
+                winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, __version__)
+    except OSError:
+        pass   # não foi instalado (é o .exe solto)
 
 
 def relaunch(target: Path) -> None:

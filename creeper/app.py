@@ -24,6 +24,7 @@ from .ui.update_dialog import UpdateDialog
 FRAME_MS = 33
 CARE_CONFIRM_SECONDS = 10 * 60   # quanto tempo dá pra apertar "Fiz!" depois de um lembrete
 UPDATE_SNOOZE_SECONDS = 24 * 3600   # "agora não": pergunta de novo no dia seguinte
+ASK_UPDATES_MS = 20 * 1000   # sem instalador: depois da saudação, pergunta se pode procurar versão nova
 CARE_REMINDERS = {"lembrete_agua": "agua", "lembrete_pausa": "pausa"}
 
 
@@ -78,8 +79,12 @@ class CompanionApp(QObject):
         self._update_dialog: UpdateDialog | None = None
         self.updater = updater.Updater(self.on_update_result, self)
         updater.cleanup()
+        updater.sync_installed_version()
         QTimer.singleShot(15000, lambda: updater.cleanup(partial=False))   # o antigo pode demorar a fechar
-        if self.settings.check_updates:
+        choice = updater.take_installer_choice()
+        if choice is not None:
+            self.settings.check_updates = choice   # o que marcaram no instalador
+        if self.settings.check_updates:   # só procura sozinho se deixaram (None: ainda vai perguntar)
             self.updater.start()
 
         self.sounds = Sounds(self.settings, self)
@@ -386,6 +391,8 @@ class CompanionApp(QObject):
             pet.line(f"saudacao_{period}")
         else:
             pet.line("voltou_curto")
+        if self.settings.check_updates is None:
+            QTimer.singleShot(ASK_UPDATES_MS, self.ask_updates)
 
     # ---- visibilidade ----------------------------------------------------
     def apply_visibility(self) -> None:
@@ -554,7 +561,30 @@ class CompanionApp(QObject):
         self._update_dialog.show()
 
     def check_update_now(self) -> None:
-        self.updater.check(manual=True)
+        self.updater.check(manual=True)   # você pediu: vale mesmo com o aviso desligado
+
+    def ask_updates(self) -> None:
+        """Sem instalador ninguém escolheu ainda: ele pergunta se pode procurar versão nova sozinho."""
+        if self.settings.check_updates is not None or not self.window.isVisible():
+            return   # já decidiram, ou ele não está na tela (pergunta da próxima vez que abrir)
+        text = (self.lines.pick("pedir_atualizacoes", nome=self.settings.name)
+                or "Posso perguntar ao GitHub de vez em quando se saiu versão nova de mim?")
+        self.window.show_bubble(text, action="permitir_atualizacoes")
+
+    def allow_updates(self) -> None:
+        self.set_setting("check_updates", True)
+        self.tell(self.lines.pick("atualizacoes_ok", nome=self.settings.name)
+                  or "Combinado! Te aviso quando tiver novidade.")
+
+    def bubble_action(self, action: str | None) -> None:
+        """Botão do balão: "Fiz!" (lembretes), "Ver" (versão nova) ou "Pode!" (permissão pra procurar)."""
+        if action == "atualizar":
+            self.open_update()
+        elif action == "permitir_atualizacoes":
+            self.window.clear_sticky()
+            self.allow_updates()
+        else:
+            self.confirm_care()
 
     def skip_update(self, release: updater.Release) -> None:
         self.settings.skip_version = release.version

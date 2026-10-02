@@ -506,6 +506,10 @@ versao_nova:
 versao_em_dia:
   - "Já tô na versão mais nova ({versao}). Novinho igual creeper recém-spawnado."
   - "Nada de novo: a {versao} ainda é a mais recente."
+pedir_atualizacoes:
+  - "Posso perguntar ao GitHub de vez em quando se saiu versão nova de mim? Não conto nada seu pra ninguém."
+atualizacoes_ok:
+  - "Combinado! Quando sair um eu novo, te aviso."
 versao_sem_internet:
   - "Não consegui ver se tem versão nova. A internet explodiu? Não fui eu."
 atualizado:

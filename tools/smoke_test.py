@@ -498,7 +498,7 @@ check(pet.state != "exercise" and prog.care_budget == budget, "brincar sozinho n
 
 # ---- mouse em cima: ele para, e o menu abre do lado ------------------------------
 pet.set_state("walk", target=pet.x + (200 if pet.x < middle else -200))
-win.hover_since = time.monotonic()
+win.hover_since, win.hover_lost = time.monotonic(), None   # sem "saiu" velho de passos anteriores
 run(0.1)
 check(pet.state == "idle", "para de andar quando o mouse chega nele")
 pet.set_state("come", target=pet.x + 300)
@@ -561,6 +561,33 @@ check(rel.version == "99.0.0" and rel.size == 123 and rel.sha256 == "abc123" and
 check(updater.parse_release(fake, "linux").sha256 is None and updater.parse_release(fake, "darwin").url is None
       and updater.parse_release(dict(fake, prerelease=True)) is None, "sem arquivo pro sistema / pré-release")
 check(updater.target_file() is None and not updater.can_self_update(rel), "pelo código-fonte só avisa")
+
+check(app.settings.check_updates is None and not app.updater.timer.isActive(),
+      "sem instalador, não procura sozinho antes de perguntar")
+pet.set_state("idle", dur=999)
+win.bubble_text, win.sticky = None, None
+app.ask_updates()
+win.frame()
+win.grab()
+check(bool(win.sticky) and win.sticky[1] == "permitir_atualizacoes" and "GitHub" in (win.bubble_text or ""),
+      "pergunta se pode procurar versão nova")
+shot("pede_permissao", hover=False)
+x_before = pet.x
+pet.x = win.screen().geometry().left() + 30.0   # encostado na borda: parte da janela fica fora da tela
+win.sync_position()
+win.grab()
+lo, hi = win._visible_x_range()
+check(lo > 0 and win.bubble_btn.right() <= hi, "perto da borda da tela, o balão não sai cortado")
+shot("pede_permissao_borda", hover=False)
+pet.x = x_before
+win.sync_position()
+win.grab()
+QTest.mouseClick(win, Qt.LeftButton, Qt.NoModifier, win.bubble_btn.center())
+check(app.settings.check_updates is True and app.updater.timer.isActive() and win.sticky is None,
+      "botão Pode! liga a procura")
+app.updater.stop()   # nada de internet no teste
+app.ask_updates()
+check(win.sticky is None, "não pergunta de novo depois que deixaram")
 
 upd_dir = Path(tempfile.mkdtemp(prefix="creeper-upd-"))
 exe = upd_dir / "CreeperCompanion.exe"

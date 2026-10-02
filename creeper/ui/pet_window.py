@@ -24,7 +24,7 @@ WIDTH = 270
 STATUS_W = 214
 BUBBLE_MAX_W = 236
 STICKY_SECONDS = 90   # quanto tempo o balão com botão ("Fiz!", "Ver") fica voltando
-STICKY_BUTTONS = {"atualizar": "Ver"}   # o resto (lembretes de água e pausa) é "Fiz!"
+STICKY_BUTTONS = {"atualizar": "Ver", "permitir_atualizacoes": "Pode!"}   # lembretes de água e pausa: "Fiz!"
 
 TOOLTIP_BG = QColor(18, 4, 22, 238)
 TOOLTIP_BORDER = QColor("#4B2A86")
@@ -214,8 +214,8 @@ class PetWindow(QWidget):
                 self._occluder_rect().getRect() if pet.occluder else None)
 
     def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
-        """Mostra uma fala. Com `action` ("agua"/"pausa": "Fiz!"; "atualizar": "Ver"), o balão ganha
-        um botão e volta se outra fala o cobrir."""
+        """Mostra uma fala. Com `action` (veja STICKY_BUTTONS), o balão ganha um botão e volta se
+        outra fala o cobrir."""
         self.bubble_text = text
         if action:
             self.sticky = (text, action, time.monotonic() + STICKY_SECONDS)
@@ -605,13 +605,14 @@ class PetWindow(QWidget):
     def _draw_bubble(self, p: QPainter, bottom: float) -> None:
         text = self.bubble_text
         fm = QFontMetrics(self.font_bubble)
-        br = fm.boundingRect(QRect(0, 0, BUBBLE_MAX_W - 22, 1000), Qt.TextWordWrap, text)
+        lo, hi = self._visible_x_range()
+        max_w = max(120, min(BUBBLE_MAX_W, hi - lo - 4))   # perto da borda da tela, o balão fica mais estreito
+        br = fm.boundingRect(QRect(0, 0, max_w - 22, 1000), Qt.TextWordWrap, text)
         bw, bh = br.width() + 22, br.height() + 14
         with_button = self.sticky is not None and text == self.sticky[0]
         if with_button:
             bw = max(bw, 92)
             bh += 24
-        lo, hi = self._visible_x_range()
         x = int(max(lo + 2, min(hi - bw - 2, (WIDTH - bw) / 2)))
         y = int(bottom - bh - 8)
         black, white = QColor("#111111"), QColor("#FFFFFF")
@@ -658,10 +659,7 @@ class PetWindow(QWidget):
         gpos = e.globalPosition().toPoint()
         if e.button() == Qt.LeftButton:
             if self.bubble_text and self.bubble_btn and self.bubble_btn.contains(pos):
-                if self.sticky and self.sticky[1] == "atualizar":
-                    self.app.open_update()
-                else:
-                    self.app.confirm_care()
+                self.app.bubble_action(self.sticky[1] if self.sticky else None)
                 return
             gift = self.gift_rect()
             if gift and gift.adjusted(-3, -3, 3, 3).contains(pos):

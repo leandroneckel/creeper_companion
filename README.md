@@ -9,10 +9,12 @@ Funciona no **Windows** e no **Linux** (GNOME incluído).
 
 ## Como abrir
 
-- **Windows (mais fácil):** baixe o `CreeperCompanion.exe` da
-  [última versão](https://github.com/leandroneckel/creeper_companion/releases/latest) e abra. Não precisa instalar
-  nada. Deixe o arquivo numa pasta sua (por exemplo `Documentos\Creeper`), porque é ali que ele se atualiza.
-  Na primeira vez o Windows pode dizer que o editor é desconhecido: clique em **Mais informações → Executar assim mesmo**.
+- **Windows (mais fácil):** baixe o instalador na
+  [página do Creeper Companion](https://leandroneckel.github.io/creeper_companion/) e siga os passos de lá.
+  Não precisa ser administrador; ele cria o atalho no Menu Iniciar e se atualiza sozinho depois.
+  Prefere sem instalar? O `CreeperCompanion.exe` da
+  [última versão](https://github.com/leandroneckel/creeper_companion/releases/latest) abre direto (deixe numa
+  pasta sua, porque é ali que ele se atualiza).
 - **Windows, pelo código:** dois cliques em `iniciar_windows.bat`. Na primeira vez ele cria o ambiente e instala
   as dependências.
 - **Linux:** `./iniciar_linux.sh`
@@ -141,21 +143,31 @@ Quando sai uma versão nova, o creeper avisa num balão (ou num aviso da bandeja
 **atualizar agora** (ele baixa, confere e reabre sozinho em poucos segundos), deixar pra **depois** ou **pular
 aquela versão**. Nível, itens e o resto do progresso ficam salvos à parte e continuam iguais.
 
-- Ele procura 1 minuto depois de abrir e depois a cada 6 horas. Também dá pra procurar na hora ou desligar o
-  aviso em **Configurações**.
+- Só procura sozinho se deixarem: o instalador tem a opção (já marcada) e, sem instalador, o creeper pergunta na
+  primeira vez que abre (botão **Pode!**). Aí ele procura 1 minuto depois de abrir e depois a cada 6 horas.
+  Fora isso ele não usa a internet. Dá pra procurar na hora ou ligar/desligar em **Configurações**.
 - Rodando pelo código-fonte ele só avisa; pra atualizar, `git pull`.
 
 ### Publicar uma versão (pra quem mantém o projeto)
 
 ```bash
-pip install -r requirements-dev.txt   # PyInstaller
-gh auth login                          # GitHub CLI, uma vez só
-python tools/release.py 1.2.0          # gera o .exe, cria a tag v1.2.0 e a release com ele anexado
+pip install -r requirements-dev.txt    # PyInstaller
+winget install JRSoftware.InnoSetup     # gera o instalador
+gh auth login                           # GitHub CLI, uma vez só
+python tools/release.py 1.2.0           # gera o .exe e o instalador, cria a tag v1.2.0 e a release
 ```
 
 O script confere que o git está limpo e em dia, mostra as notas (por padrão, os títulos dos commits desde a
-última versão; ou use `--notas "..."`) e pergunta antes de publicar. Pra só gerar o executável e testar:
-`python tools/build_exe.py` (sai em `dist/`).
+última versão; ou use `--notas "..."`) e pergunta antes de publicar. A release leva dois arquivos:
+`CreeperCompanion-Setup.exe` (o que as pessoas baixam na primeira vez) e `CreeperCompanion.exe` (o que a
+atualização automática baixa). Na primeira vez ele também liga o GitHub Pages, que publica a página de download
+(`docs/index.html`) em https://leandroneckel.github.io/creeper_companion/.
+
+Pra só gerar os arquivos e testar: `python tools/build_exe.py` (saem em `dist/`).
+
+**Assinatura digital (opcional):** com um certificado de assinatura de código instalado no Windows, defina
+`CREEPER_CERTIFICADO` com a impressão digital (thumbprint) dele antes de gerar, e o `.exe` e o instalador saem
+assinados (com carimbo de tempo).
 
 ## Áreas de trabalho virtuais
 
@@ -218,8 +230,10 @@ tools/smoke_test.py     teste automático sem tela (python tools/smoke_test.py)
 tools/preview_sprites.py  gera uma folha com todas as expressões e ícones
 tools/preview_sounds.py   toca os sons um por um (ou salva os WAV)
 tools/readme_image.py   gera a imagem do README (docs/creeper-companion.png)
-tools/build_exe.py      gera o executável com o PyInstaller (dist/)
-tools/release.py        publica uma versão: executável + tag + release no GitHub
+tools/build_exe.py      gera o executável (PyInstaller) e o instalador (Inno Setup) em dist/
+tools/instalador.iss    roteiro do instalador
+tools/release.py        publica uma versão: executável + instalador + tag + release no GitHub
+docs/index.html         página de download (GitHub Pages)
 ```
 
 ## Licença
@@ -236,5 +250,5 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 - Executável para Linux: o atualizador já sabe trocar um `CreeperCompanion-linux` anexado à release, falta gerar
   e testar numa máquina Linux.
-- Assinar o `.exe` (tira o aviso de "editor desconhecido" do Windows; o certificado é pago).
+- Certificado de assinatura de código (pago). O build já assina quando houver um (veja "Publicar uma versão").
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).

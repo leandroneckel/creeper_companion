@@ -1,11 +1,12 @@
-"""Publica uma versão nova: gera o executável e cria a release no GitHub (sem GitHub Actions).
+"""Publica uma versão nova: gera o executável e o instalador e cria a release no GitHub (sem GitHub Actions).
 
 Uso:  python tools/release.py 1.2.0 [--notas "o que mudou"]
 
 1. confere que o git está limpo, na main e em dia com o GitHub
-2. grava a versão em creeper/__init__.py e gera o executável (tools/build_exe.py)
+2. grava a versão em creeper/__init__.py e gera o executável e o instalador (tools/build_exe.py)
 3. mostra as notas e pergunta se pode publicar
-4. commit "Versão 1.2.0", tag v1.2.0, push e release no GitHub com o executável anexado
+4. commit "Versão 1.2.0", tag v1.2.0, push e release no GitHub com os dois anexados
+5. na primeira vez, liga o GitHub Pages (a página de download, que fica em docs/)
 
 Sem --notas, as notas são os títulos dos commits desde a última versão (é o que o tutor lê na janela
 "versão nova"). Os creepers rodando por aí descobrem em até 6 horas, ou 1 minuto depois de abrirem.
@@ -21,8 +22,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools"))
 INIT = ROOT / "creeper" / "__init__.py"
+PAGE_URL = "https://leandroneckel.github.io/creeper_companion/"
 
+import build_exe  # noqa: E402
 from creeper import __version__ as CURRENT, updater  # noqa: E402
 
 
@@ -45,6 +49,17 @@ def default_notes() -> str:
     return "\n".join(lines) or "- Pequenas melhorias."
 
 
+def ensure_pages() -> None:
+    """Liga o GitHub Pages servindo a pasta docs/ da main (a página de download), se ainda não estiver."""
+    exists = subprocess.run(["gh", "api", f"repos/{updater.REPO}/pages", "--silent"], cwd=ROOT,
+                            capture_output=True).returncode == 0
+    if not exists:
+        run("gh", "api", "-X", "POST", f"repos/{updater.REPO}/pages",
+            "-f", "source[branch]=main", "-f", "source[path]=/docs")
+        run("gh", "repo", "edit", updater.REPO, "--homepage", PAGE_URL)
+        print(f"Página de download ligada (leva uns minutos pra aparecer na primeira vez): {PAGE_URL}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Publica uma versão nova do Creeper Companion.")
     parser.add_argument("versao", help="ex.: 1.2.0")
@@ -61,6 +76,8 @@ def main() -> None:
     if not shutil.which("gh"):
         sys.exit("Falta o GitHub CLI: https://cli.github.com (depois: gh auth login)")
     run("gh", "auth", "status")
+    if sys.platform == "win32" and not build_exe.find_iscc():
+        sys.exit("Falta o Inno Setup 6, que gera o instalador:  winget install JRSoftware.InnoSetup")
     if run("git", "status", "--porcelain"):
         sys.exit("Tem mudanças sem commit. Faça o commit (ou guarde) antes de publicar.")
     if run("git", "branch", "--show-current") != "main":
@@ -81,13 +98,16 @@ def main() -> None:
         if bumped:
             set_version(CURRENT)
         sys.exit("O executável não foi gerado; nada foi publicado.")
-    exe = ROOT / "dist" / updater.ASSET_NAMES[sys.platform]
+    assets = [build_exe.exe_path()]
+    if sys.platform == "win32":
+        assets.insert(0, build_exe.setup_path())
 
-    print(f"\nVersão {version}: {exe.name} ({exe.stat().st_size / 1e6:.1f} MB)\nNotas:\n{notes}\n")
+    files = ", ".join(f"{a.name} ({a.stat().st_size / 1e6:.1f} MB)" for a in assets)
+    print(f"\nVersão {version}: {files}\nNotas:\n{notes}\n")
     if input(f"Publicar {tag} no GitHub? [s/N] ").strip().lower() not in ("s", "sim"):
         if bumped:
             set_version(CURRENT)
-        sys.exit("Nada foi publicado (o executável ficou em dist/ pra você testar).")
+        sys.exit("Nada foi publicado (os arquivos ficaram em dist/ pra você testar).")
 
     if bumped:
         run("git", "add", str(INIT))
@@ -96,10 +116,12 @@ def main() -> None:
     run("git", "push", "origin", "main", tag)
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
         f.write(notes)
-    run("gh", "release", "create", tag, str(exe), "--title", f"Versão {version}", "--notes-file", f.name,
-        "--verify-tag")
+    run("gh", "release", "create", tag, *map(str, assets), "--title", f"Versão {version}",
+        "--notes-file", f.name, "--verify-tag")
     Path(f.name).unlink(missing_ok=True)
     print("Publicada:", run("gh", "release", "view", tag, "--json", "url", "-q", ".url"))
+    ensure_pages()
+    print(f"Link pra mandar pras pessoas: {PAGE_URL}")
 
 
 if __name__ == "__main__":

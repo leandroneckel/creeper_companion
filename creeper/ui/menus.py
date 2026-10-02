@@ -299,7 +299,8 @@ def _fill_settings(app, menu: QMenu) -> None:
            lambda v: app.set_setting("notifications", v))
     _check(menu, "Iniciar com o sistema", app.autostart_enabled(), app.set_autostart)
     menu.addSeparator()
-    _check(menu, "Avisar quando sair versão nova", s.check_updates, lambda v: app.set_setting("check_updates", v))
+    _check(menu, "Avisar quando sair versão nova", bool(s.check_updates),
+           lambda v: app.set_setting("check_updates", v))
     act = menu.addAction(f"Procurar versão nova (esta é a {__version__})")
     act.triggered.connect(app.check_update_now)
     menu.addSeparator()

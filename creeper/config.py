@@ -56,7 +56,7 @@ class Settings:
     solo_play: bool = True         # brinca sozinho quando está feliz
     climb: bool = True             # sobe nas janelas abertas
     # versão nova
-    check_updates: bool = True     # procura sozinho de tempos em tempos
+    check_updates: bool | None = None   # procura sozinho? None = ainda não perguntou (só procura se deixarem)
     skip_version: str = ""         # "pular esta versão": não oferece essa de novo sozinho
 
     @classmethod
