@@ -15,6 +15,7 @@ TMP = tempfile.mkdtemp(prefix="creeper-img-")
 os.environ["APPDATA"] = TMP
 os.environ["XDG_CONFIG_HOME"] = TMP
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ["CREEPER_SEM_SOM"] = "1"
 os.environ.setdefault("QT_SCALE_FACTOR", "2")
 if sys.platform == "win32":
     os.environ.setdefault("QT_QPA_FONTDIR", r"C:\Windows\Fonts")
@@ -77,11 +78,15 @@ def grab(bubble: str | None = None, hover: bool = False) -> QImage:
 
 scenes = []
 
-# 1. passando o mouse: barra de botões, status e saudação
+# 1. passando o mouse: barra de botões, status (com nível) e um presente esperando
 reset(fome=55, sede=70, energia=85, sono=62, diversao=92)
+app.progress.level = 7
+app.progress.xp = app.progress.needed * 0.6
+app.progress.presents = 1
 pet.cursor = (pet.x + 300, pet.y - 600)
 run(0.3)
 scenes.append(grab("Oi! Eu sou o Creepinho. Passa o mouse em mim pra ver do que eu preciso.", hover=True))
+app.progress.presents = 0
 
 # 2. comendo bolo
 reset(fome=55)

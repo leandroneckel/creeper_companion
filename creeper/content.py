@@ -22,6 +22,13 @@ class Items:
     def get(self, item_id: str) -> dict:
         return self.by_id[item_id]
 
+    def all(self) -> list[dict]:
+        return list(self.by_id.values())
+
+    def limited(self) -> list[dict]:
+        """Itens com quantidade (os especiais); os outros são infinitos."""
+        return [item for item in self.by_id.values() if item.get("limitado")]
+
 
 class Lines:
     """Sorteia falas por situação, evitando repetir as mais recentes."""
@@ -53,5 +60,6 @@ def _load_yaml(name: str) -> dict:
         return yaml.safe_load(fh) or {}
 
 
-def load_content() -> tuple[Items, Lines]:
-    return Items(_load_yaml("itens.yaml")), Lines(_load_yaml("falas.yaml"))
+def load_content() -> tuple[Items, Lines, list[dict]]:
+    achievements = [a for a in (_load_yaml("conquistas.yaml").get("conquistas") or []) if a.get("id")]
+    return Items(_load_yaml("itens.yaml")), Lines(_load_yaml("falas.yaml")), achievements

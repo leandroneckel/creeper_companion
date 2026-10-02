@@ -44,7 +44,7 @@ class Tray(QSystemTrayIcon):
             img = sprite.render_head(pose).scaled(64, 64, Qt.IgnoreAspectRatio, Qt.FastTransformation)
             self.setIcon(QIcon(QPixmap.fromImage(img)))
         worst, value = n.worst()
-        tip = f"{self.app.settings.name} · {n.mood()}"
+        tip = f"{self.app.settings.name} · nível {self.app.progress.level} · {n.mood()}"
         if value < 40:
             tip += f" ({n.level_word(worst)})"
         self.setToolTip(tip)

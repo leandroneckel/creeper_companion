@@ -34,6 +34,9 @@ pet.say = lambda text, kind="chat": (said.append((kind, text)), app.on_say(text,
 sounds: list[str] = []
 app.play_sound = lambda name, volume=1.0: sounds.append(name)
 pet.sfx = app.play_sound
+achieved: list[str] = []
+pet.on_achievement = lambda ach: (achieved.append(ach["id"]), app.on_achievement(ach))
+prog = app.progress
 win.show()
 
 
@@ -157,14 +160,92 @@ app.last_water -= app.settings.water_minutes * 60
 app.care_tick()
 check(said[-1][0] == "reminder" and sounds[-1] == "lembrete", "lembrete de água com som")
 
+# ---- progresso: XP, níveis, presentes, estoque, conquistas ------------------
+from PySide6.QtWidgets import QMenu  # noqa: E402
+from creeper.ui import menus  # noqa: E402
+
+check(app.pending_care() == "agua" and win.sticky_active(), "lembrete de água vem com o botão Fiz!")
+win.show_bubble("Ai!", 5)
+win.bubble_until = 0
+win.frame()
+check(win.bubble_text == win.sticky[0], "lembrete volta depois de outra fala")
+shot("lembrete_fiz")
+win.grab()
+check(win.bubble_btn is not None, "botão Fiz! desenhado no balão")
+xp0 = prog.total_xp
+app.confirm_care()
+run(0.3)
+check(prog.total_xp >= xp0 + 15 and prog.counters.get("agua_feita") == 1 and not win.sticky_active()
+      and app.pending_care() is None, "apertar Fiz! dá XP e fecha o lembrete")
+
+check("primeira_mordida" in achieved and "primeira_mordida" in prog.done, "conquista ao dar a primeira comida")
+check("inimigo_natural" in achieved and "tsss_bum" in achieved, "conquistas de gato e explosão")
+check(app.toast.current is not None, "aviso de conquista aparece")
+if SHOTS:
+    app.toast.grab().save(str(SHOTS / "conquista.png"))
+
+budget = prog.care_budget
+prog.care_budget = 0
+check(prog.care("comer") == 0, "cuidar tem limite de XP por hora")
+prog.care_budget = budget
+
+level0, presents0, said0 = prog.level, prog.presents, len(said)
+prog.add_xp(prog.needed - prog.xp + 1)
+run(0.5)
+check(prog.level == level0 + 1 and prog.presents == presents0 + 1, "subir de nível traz presente")
+check(any(kind == "reaction" and str(prog.level) in text for kind, text in said[said0:]) and "nivel" in sounds,
+      "comemora o nível novo")
+shot("presente")
+check(win.gift_rect() is not None, "presente aparece do lado dele")
+inventory0, xp0, n0 = dict(prog.inventory), prog.total_xp, prog.presents
+app.open_present()
+run(0.3)
+check(prog.presents == n0 - 1 and (prog.inventory != inventory0 or prog.total_xp > xp0), "abrir presente dá item ou XP")
+
+pet.needs.values["fome"] = 30
+prog.inventory["maca_dourada"] = 0
+pet.feed("maca_dourada")
+run(0.2)
+check(pet.state != "eat", "sem estoque, não come")
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+food_menu = next(a.menu() for a in main_menu.actions() if a.text() == "Comer")
+apple_action = next(a for a in food_menu.actions() if a.text().startswith("Maçã dourada"))
+check(apple_action.text().endswith("×0") and not apple_action.isEnabled(), "menu mostra estoque zerado")
+check(any(a.text().startswith(f"Conquistas ({len(prog.done)}/") for a in main_menu.actions()),
+      "menu de conquistas")
+prog.inventory["maca_dourada"] = 1
+pet.feed("maca_dourada")
+run(0.2)
+check(pet.state == "eat" and prog.inventory["maca_dourada"] == 0, "come e gasta do estoque")
+run(3)
+
+pet.needs.values["fome"] = 5
+prog.xp = 50.0
+prog.tick(60, True, pet.needs)
+run(0.1)
+check(prog.losing and prog.xp < 50, "descuido tira XP")
+level0 = prog.level
+prog.xp = 1.0
+prog.tick(3600, False, pet.needs)
+check(prog.level == level0 and prog.xp == 0, "descuido nunca rebaixa de nível")
+pet.needs.values["fome"] = 80
+
+import json  # noqa: E402
+from creeper.progress import Progress  # noqa: E402
+again = Progress.from_dict(json.loads(json.dumps(prog.to_dict())), app.items, app.achievements)
+check((again.level, again.inventory, set(again.done), again.counters) ==
+      (prog.level, prog.inventory, set(prog.done), prog.counters), "progresso salva e carrega igual")
+fresh = Progress.from_dict(None, app.items, app.achievements)
+check(fresh.level == 1 and fresh.inventory == {"maca_dourada": 1, "pocao_velocidade": 2},
+      "save antigo começa no nível 1 com o estoque inicial")
+
 for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
-             "carinho", "tonto"):
+             "carinho", "tonto", "xp", "nivel", "conquista"):
     check(name in sounds, f"som '{name}' tocou")
 check(any(n.startswith("nota_") for n in sounds), "dançar toca notas")
 
-from PySide6.QtWidgets import QMenu  # noqa: E402
 from creeper.sound import synth  # noqa: E402
-from creeper.ui import menus  # noqa: E402
 
 main_menu = QMenu()
 menus.fill_main(app, main_menu)

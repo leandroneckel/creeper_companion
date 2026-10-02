@@ -395,6 +395,36 @@ def chime(rng) -> list:
     return add_at(out, partials(1046.5, 0.9, 0.35, BELL), 0.16)
 
 
+def orb(rng, freq: float) -> list:
+    """XP: tilintar curtinho e agudo."""
+    return partials(freq, 0.2, 0.06, ((1, 1.0), (2, 0.25), (3.01, 0.08)))
+
+
+def level_up(rng) -> list:
+    """Subiu de nível: arpejo dedilhado subindo e um acorde de sinos que fica soando."""
+    out: list = []
+    for i, f in enumerate((523.25, 659.26, 783.99)):
+        add_at(out, partials(f, 0.35, 0.2, HARP, tau_exp=0.7), i * 0.07)
+    for f, gain in ((1046.5, 1.0), (1318.51, 0.7), (1567.98, 0.6)):
+        add_at(out, partials(f, 1.0, 0.45, BELL), 0.21, gain)
+    return out
+
+
+def fanfare(rng) -> list:
+    """Conquista: 'tã-tã-tãããã' de metais, com um brilho por cima."""
+    def brass(freq: float, dur: float) -> list:
+        src = osc(dur, freq, "saw", vibrato=0.004, vib_rate=5)
+        bright = svf(src, lambda u: 900 + 2200 * math.exp(-u * 3), 0.9, "low")
+        return mul(bright, ar_env(dur, 0.02, min(0.15, dur * 0.5)))
+
+    out: list = []
+    add_at(out, brass(392.0, 0.12), 0.0)
+    add_at(out, brass(392.0, 0.12), 0.15)
+    for f, gain in ((523.25, 1.0), (659.26, 0.6), (783.99, 0.5)):
+        add_at(out, brass(f, 0.75), 0.3, gain)
+    return add_at(out, partials(2093.0, 0.8, 0.3, GLOCK), 0.3, 0.25)
+
+
 # nome -> (gerador, volume alvo em dB). Nomes com sufixo _N são variações do mesmo som
 # (o player sorteia entre elas), exceto as notas, que o creeper escolhe uma por uma.
 SOUNDS = {
@@ -417,6 +447,11 @@ SOUNDS = {
     "brilho": (sparkle, -19),
     "tonto": (dizzy, -19),
     "lembrete": (chime, -19),
+    "xp_1": (lambda rng: orb(rng, 1568.0), -24),
+    "xp_2": (lambda rng: orb(rng, 1760.0), -24),
+    "xp_3": (lambda rng: orb(rng, 2093.0), -24),
+    "nivel": (level_up, -16),
+    "conquista": (fanfare, -16),
 }
 
 

@@ -317,3 +317,44 @@ leite_cura:
 renomeado:
   - "{nome}? Gostei! Tem um certo... estrondo."
   - "Pode me chamar de {nome}. Soa explosivo."
+
+# ---- progresso (XP, níveis, presentes) ----
+# Variáveis extras: {nivel}, {itens} (o que foi desbloqueado), {item}, {xp}.
+subiu_nivel:
+  - "Nível {nivel}! Sinto que eu poderia explodir uma montanha. Mas não vou."
+  - "Subi pro nível {nivel}! Trouxe um presente pra comemorar."
+  - "Nível {nivel}, olha só! Tô ficando um creeper de respeito."
+  - "Nível {nivel}! Nem os esqueletos têm isso. Eles têm é osso."
+desbloqueou:
+  - "Nível {nivel}! E agora você pode me dar: {itens}. Só dizendo."
+  - "Nível {nivel}! Desbloqueei {itens}. Tô ansioso."
+achou_presente:
+  - "Achei isso aqui atrás de um bloco de terra. É pra você!"
+  - "Olha o que eu encontrei! Clica no presente, vai."
+  - "Fui minerar um pouquinho e voltei com um presente. Sem explodir nada!"
+  - "Presente! Não é um gato, prometo."
+presente_esperando:
+  - "Ei... tem um presente aqui do meu lado. Só lembrando."
+  - "Você não vai abrir o presente? Eu embrulhei sozinho. Sem mãos."
+  - "O presente tá esperando! Eu também."
+presente_item:
+  - "Era {item}! Bom proveito. Quer dizer, bom proveito pra mim, né."
+  - "Saiu {item}! Guarda com carinho."
+  - "Uau, {item}! Eu tenho bom gosto."
+presente_xp:
+  - "Era um monte de bolinhas de XP! +{xp}. É de coração."
+  - "Bolinhas de XP! Não é muito, mas brilha."
+sem_estoque:
+  - "Acabou {item}... quem sabe num próximo presente?"
+  - "Não tem mais {item}. Sobe de nível que eu trago mais!"
+fiz_agua:
+  - "Isso! Hidratado é outra coisa. Toma XP!"
+  - "Boa! Água é vida. Até pra quem é feito de pólvora."
+  - "Orgulho de você. Agora eu também quero água."
+fiz_pausa:
+  - "Pausa feita! Seus olhos agradecem. Eu também."
+  - "Boa! Esticar as pernas é ótimo. Eu nem tenho joelho e mesmo assim."
+  - "Isso aí! Descansar também é produtividade."
+perdendo_xp:
+  - "Tô tão mal que tô até esquecendo as coisas... tô perdendo XP!"
+  - "Me ajuda aqui... sem cuidado eu vou perdendo XP."

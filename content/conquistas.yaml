@@ -1,0 +1,169 @@
+# Conquistas: quando o contador chega na meta, aparece "Conquista feita!" e ele ganha o XP.
+#
+# Contadores disponíveis:
+#   comeu, bebeu, comidas_diferentes, bebidas_diferentes, atividades, atividades_diferentes,
+#   dancou, gato, carinhos, explosoes, acalmou (acalmou enquanto chiava), tonto, presentes,
+#   maca_dourada, tudo_cheio (todas as necessidades acima de 90), agua_feita, pausas_feitas
+#   (você apertou "Fiz!"), agua_seguidos (dias seguidos bebendo água), dias_juntos, nivel
+# "icone" é um dos ícones de creeper/art/icons.py.
+
+conquistas:
+  - id: primeira_mordida
+    nome: Primeira mordida
+    descricao: Dê comida pro creeper.
+    contador: comeu
+    meta: 1
+    xp: 10
+    icone: maca
+
+  - id: chef_de_bloco
+    nome: Chef de bloco
+    descricao: Dê 10 comidas diferentes.
+    contador: comidas_diferentes
+    meta: 10
+    xp: 50
+    icone: bolo
+
+  - id: atleta
+    nome: Atleta de bioma
+    descricao: Faça 6 atividades diferentes com ele.
+    contador: atividades_diferentes
+    meta: 6
+    xp: 40
+    icone: correr
+
+  - id: pe_de_valsa
+    nome: Pé de valsa
+    descricao: Dance com ele 10 vezes.
+    contador: dancou
+    meta: 10
+    xp: 30
+    icone: dancar
+
+  - id: inimigo_natural
+    nome: Inimigo natural
+    descricao: Traga um gato. Por quê?
+    contador: gato
+    meta: 1
+    xp: 15
+    icone: gato
+
+  - id: mao_de_veludo
+    nome: Mão de veludo
+    descricao: Faça 100 carinhos.
+    contador: carinhos
+    meta: 100
+    xp: 40
+    icone: carinho
+
+  - id: tsss_bum
+    nome: Tsss... BUM!
+    descricao: Cutuque até ele explodir. Parabéns?
+    contador: explosoes
+    meta: 1
+    xp: 10
+    icone: polvora
+
+  - id: demolidor
+    nome: Especialista em demolição
+    descricao: Faça ele explodir 10 vezes. Ele te perdoa. Acho.
+    contador: explosoes
+    meta: 10
+    xp: 30
+    icone: polvora
+
+  - id: deixa_disso
+    nome: Deixa disso
+    descricao: Acalme ele com carinho enquanto chia.
+    contador: acalmou
+    meta: 1
+    xp: 25
+    icone: carinho
+
+  - id: carrossel
+    nome: Carrossel
+    descricao: Chacoalhe até ele ficar tonto.
+    contador: tonto
+    meta: 1
+    xp: 10
+    icone: pular
+
+  - id: presente_de_creeper
+    nome: Presente de creeper
+    descricao: Abra um presente.
+    contador: presentes
+    meta: 1
+    xp: 10
+    icone: presente
+
+  - id: ouro_puro
+    nome: Ouro puro
+    descricao: Dê uma maçã dourada.
+    contador: maca_dourada
+    meta: 1
+    xp: 20
+    icone: maca_dourada
+
+  - id: barriga_cheia
+    nome: Vida boa
+    descricao: Deixe todas as necessidades acima de 90 ao mesmo tempo.
+    contador: tudo_cheio
+    meta: 1
+    xp: 30
+    icone: comer
+
+  - id: hidratado
+    nome: Hidratado
+    descricao: Beba água e aperte "Fiz!" em 7 dias seguidos.
+    contador: agua_seguidos
+    meta: 7
+    xp: 100
+    icone: agua
+
+  - id: pausa_merecida
+    nome: Pausa merecida
+    descricao: Faça 10 pausas quando ele lembrar.
+    contador: pausas_feitas
+    meta: 10
+    xp: 50
+    icone: descansar
+
+  - id: uma_semana
+    nome: Uma semana juntos
+    descricao: Passe 7 dias com ele.
+    contador: dias_juntos
+    meta: 7
+    xp: 50
+    icone: relogio
+
+  - id: um_mes
+    nome: Um mês juntos
+    descricao: Passe 30 dias com ele.
+    contador: dias_juntos
+    meta: 30
+    xp: 150
+    icone: relogio
+
+  - id: experiente
+    nome: Experiente
+    descricao: Chegue ao nível 5.
+    contador: nivel
+    meta: 5
+    xp: 0
+    icone: xp
+
+  - id: veterano
+    nome: Veterano
+    descricao: Chegue ao nível 15.
+    contador: nivel
+    meta: 15
+    xp: 0
+    icone: xp
+
+  - id: lendario
+    nome: Lendário
+    descricao: Chegue ao nível 30.
+    contador: nivel
+    meta: 30
+    xp: 0
+    icone: xp

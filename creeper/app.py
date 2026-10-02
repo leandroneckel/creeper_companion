@@ -11,12 +11,16 @@ from .config import Settings, load_save, write_save
 from .content import load_content
 from .needs import Needs
 from .pet import Pet
+from .progress import Progress
 from .sound.player import Sounds
 from .ui import menus
 from .ui.pet_window import PetWindow
+from .ui.toast import Toast
 from .ui.tray import Tray
 
 FRAME_MS = 33
+CARE_CONFIRM_SECONDS = 10 * 60   # quanto tempo dá pra apertar "Fiz!" depois de um lembrete
+CARE_REMINDERS = {"lembrete_agua": "agua", "lembrete_pausa": "pausa"}
 
 
 def format_elapsed(seconds: float) -> str:
@@ -39,16 +43,20 @@ class CompanionApp(QObject):
         save = load_save()
         self.first_run = not save
         self.settings = Settings.from_dict(save.get("settings"))
-        self.items, self.lines = load_content()
+        self.items, self.lines, self.achievements = load_content()
         pet_data = save.get("pet") or {}
         self.needs = Needs.from_dict(pet_data.get("needs"))
+        self.progress = Progress.from_dict(pet_data.get("progress"), self.items, self.achievements)
         saved_at = save.get("saved_at")
         self.away = max(0.0, time.time() - saved_at) if saved_at else 0.0
         self.needs.apply_offline(self.away, self.settings.needs_speed)
 
-        self.pet = Pet(self.settings, self.items, self.lines, self.needs)
+        self.pet = Pet(self.settings, self.items, self.lines, self.needs, self.progress)
         self.pet.say = self.on_say
+        self.pet.on_achievement = self.on_achievement
         self._place_pet(pet_data.get("x"))
+        self.care_pending: tuple[str, float] | None = None   # ("agua" | "pausa", até quando)
+        self._achievement_queue: list[dict] = []
 
         self.has_tray = QSystemTrayIcon.isSystemTrayAvailable()
         self.in_tray = self.has_tray and not (save.get("window") or {}).get("visible", True)
@@ -60,9 +68,10 @@ class CompanionApp(QObject):
         self.sounds = Sounds(self.settings, self)
         self.pet.sfx = self.play_sound
         self.pet.sfx_stop = self.sounds.stop
-        QTimer.singleShot(500, self.sounds.load)  # na 1ª vez gera os WAV (~0,5 s); deixa a janela aparecer antes
+        QTimer.singleShot(500, self.sounds.load)  # o que faltar no cache é gerado em segundo plano
 
         self.window = PetWindow(self)
+        self.toast = Toast()
         self.tray = Tray(self)
         self.tray.show()
 
@@ -163,13 +172,14 @@ class CompanionApp(QObject):
         self.tray.refresh()
 
     def care_tick(self) -> None:
-        """Lembretes pra você: água, pausas e hora de dormir."""
+        """XP pelo tempo junto e lembretes pra você: água, pausas e hora de dormir."""
         now = time.monotonic()
         dt = now - self._last_care
         self._last_care = now
         idle = desktop.user_idle_seconds()
         self.pet.user_idle(idle)
         active = idle is None or idle < 120
+        self.progress.tick(dt, active, self.needs)
         if active:
             self.active_streak += dt
         elif idle > 300:
@@ -188,8 +198,42 @@ class CompanionApp(QObject):
         elif s.remind_sleep and datetime.now().hour < 5 and now - self.last_sleep_reminder > 30 * 60:
             self.last_sleep_reminder = now
             reminder = "lembrete_dormir"
+        if reminder in CARE_REMINDERS:
+            self.care_pending = (CARE_REMINDERS[reminder], now + CARE_CONFIRM_SECONDS)
         if reminder and self.pet.line(reminder, "reminder"):
             self.play_sound("lembrete")
+
+    def pending_care(self) -> str | None:
+        """"agua" ou "pausa" se ainda dá pra apertar "Fiz!" no último lembrete."""
+        if self.care_pending and time.monotonic() < self.care_pending[1]:
+            return self.care_pending[0]
+        return None
+
+    def confirm_care(self) -> None:
+        kind = self.pending_care()
+        self.care_pending = None
+        self.window.clear_sticky()
+        if kind:
+            self.pet.self_care(kind)
+
+    def open_present(self) -> None:
+        self.pet.open_present()
+
+    # ---- conquistas ------------------------------------------------------
+    def on_achievement(self, achievement: dict) -> None:
+        self._achievement_queue.append(achievement)
+        self._flush_achievements()
+
+    def _flush_achievements(self) -> None:
+        if self.fs_hidden:
+            return  # espera o jogo/vídeo em tela cheia acabar
+        while self._achievement_queue:
+            ach = self._achievement_queue.pop(0)
+            if self.window.isVisible():
+                self.toast.show_achievement(ach, self.window.screen())
+                self.play_sound("conquista")
+            elif self.settings.notifications:
+                self.tray.showMessage("Conquista feita!", ach["nome"], self.tray.icon(), 6000)
 
     # ---- fala e sons -----------------------------------------------------
     def play_sound(self, name: str, volume: float = 1.0) -> None:
@@ -198,7 +242,13 @@ class CompanionApp(QObject):
 
     def on_say(self, text: str, kind: str = "chat") -> None:
         if self.window.isVisible():
-            self.window.show_bubble(text)
+            care = self.pending_care() if kind == "reminder" else None
+            if care:
+                self.window.show_bubble(text, action=care)
+            elif kind in ("chat", "need") and self.window.sticky_active():
+                pass  # não cobre o lembrete com o botão "Fiz!" com conversa fiada
+            else:
+                self.window.show_bubble(text)
             return
         if (kind in ("need_critical", "reminder") and self.settings.notifications
                 and self.in_tray and not self.fs_hidden):
@@ -229,6 +279,7 @@ class CompanionApp(QObject):
             self.window.show()
         elif not should and self.window.isVisible():
             self.window.hide()
+        self._flush_achievements()   # conquistas que esperaram a tela cheia acabar
 
     def toggle_visible(self) -> None:
         if self.in_tray:

@@ -10,6 +10,11 @@
 # "status" aplica um efeito temporário: dourado, enjoado, cafeinado, velocidade.
 # "cura: true" remove os efeitos ruins (enjoado, cafeinado).
 # "duracao" (atividades) é em segundos.
+# "nivel" (opcional): nível em que o item é desbloqueado. Sem ele, está liberado desde o começo.
+# "limitado" (opcional): o item tem quantidade em vez de ser infinito.
+#   inicial  -> quantas unidades você ganha quando o item aparece pela primeira vez
+#   peso     -> chance relativa de vir num presente
+#   presente -> quantas unidades vêm num presente
 
 comidas:
   - id: maca
@@ -46,6 +51,7 @@ comidas:
     nome: Maçã dourada
     efeitos: {fome: 30, energia: 30, diversao: 15, sono: 10}
     status: dourado
+    limitado: {inicial: 1, peso: 1, presente: 1}
   - id: carne_podre
     nome: Carne podre
     efeitos: {fome: 15, diversao: -15}
@@ -70,6 +76,7 @@ bebidas:
     nome: Poção de velocidade
     efeitos: {sede: 15, energia: 15}
     status: velocidade
+    limitado: {inicial: 2, peso: 3, presente: 2}
 
 atividades:
   - id: caminhar

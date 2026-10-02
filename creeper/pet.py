@@ -12,6 +12,7 @@ from datetime import datetime
 
 from .art.sprite import Pose
 from .needs import Needs
+from .progress import Progress
 
 CHAT_COOLDOWN = {"pouco": 360, "normal": 160, "muito": 75}
 CHAT_CHANCE = {"pouco": 0.25, "normal": 0.4, "muito": 0.6}
@@ -47,11 +48,12 @@ class Particle:
 
 
 class Pet:
-    def __init__(self, settings, items, lines, needs: Needs):
+    def __init__(self, settings, items, lines, needs: Needs, progress: Progress):
         self.settings = settings
         self.items = items
         self.lines = lines
         self.needs = needs
+        self.progress = progress
 
         self.state = "idle"
         self.t = 0.0
@@ -96,6 +98,7 @@ class Pet:
         self.say = lambda text, kind="chat": None
         self.sfx = lambda name, volume=1.0: None
         self.sfx_stop = lambda name: None
+        self.on_achievement = lambda achievement: None
 
     # ---- utilidades ------------------------------------------------------
     @property
@@ -169,6 +172,9 @@ class Pet:
 
         getattr(self, f"_u_{self.state}")(dt)
 
+        for event in self.progress.drain():
+            self._on_progress(event)
+
         self._ground_check()
         self._blink()
         self._effects_fx(dt)
@@ -209,6 +215,9 @@ class Pet:
             self.start_sleep()
             return
         self.maybe_chat()
+        if self.progress.presents:
+            self.set_state("idle", dur=random.uniform(4, 8))  # espera você abrir o presente
+            return
         r = random.random()
         if n["energia"] < 25 and r < 0.5:
             self.set_state("sit", dur=random.uniform(20, 45))
@@ -280,6 +289,12 @@ class Pet:
         if item.get("status"):
             n.add_effect(item["status"])
         verb = "comer" if item["categoria"] == "comidas" else "beber"
+        prog = self.progress
+        prog.bump("comeu" if verb == "comer" else "bebeu")
+        prog.collect(item["categoria"], item["id"])
+        if item["id"] == "maca_dourada":
+            prog.bump("maca_dourada")
+        self._xp_fx(prog.care(verb))
         if item.get("status") in ("dourado", "velocidade"):
             self.sfx("brilho")
         elif verb == "comer" and random.random() < 0.35:
@@ -399,6 +414,12 @@ class Pet:
     def _finish_exercise(self) -> None:
         kind = self.data["kind"]
         self.needs.apply(self.items.get(kind).get("efeitos"))
+        prog = self.progress
+        prog.bump("atividades")
+        prog.collect("atividades", kind)
+        if kind in ("dancar", "gato"):
+            prog.bump("dancou" if kind == "dancar" else "gato")
+        self._xp_fx(prog.care("gato" if kind == "gato" else "atividade"))
         self.jump = 0
         self.hidden = False
         self.set_state("idle", dur=random.uniform(3, 5))
@@ -414,6 +435,7 @@ class Pet:
         if self.needs.annoyance < 70:
             self.flash = self.swell = 0.0
             self.sfx_stop("chiado")
+            self.progress.bump("acalmou")
             self.set_state("idle", dur=3)
             self.line("carinho_acalmou", "reaction")
             return
@@ -446,6 +468,7 @@ class Pet:
         self.held = None
         self.set_state("exploded")
         self.sfx("explosao")
+        self.progress.bump("explosoes")
 
     def _u_exploded(self, dt: float) -> None:
         if self.t >= 3.5:
@@ -488,7 +511,10 @@ class Pet:
     # ---- ações vindas do usuário -----------------------------------------
     def feed(self, item_id: str) -> None:
         item = self.items.get(item_id)
-        if not self.can_interact() or self.busy():
+        if not self.can_interact() or self.busy() or not self.progress.unlocked(item):
+            return
+        if self.progress.stock(item) == 0:
+            self.line("sem_estoque", "reaction", item=item["nome"])
             return
         if self.state == "sleep":
             self.wake(forced=True)
@@ -497,13 +523,14 @@ class Pet:
         if self.needs[stat] >= 95:
             self.line("comer_cheio" if food else "beber_cheio", "reaction")
             return
+        self.progress.take(item)
         self.held = item_id
         self.set_state("eat" if food else "drink", item=item_id)
         self.sfx("pop")
 
     def do_activity(self, act_id: str) -> None:
         item = self.items.get(act_id)
-        if not self.can_interact() or self.busy():
+        if not self.can_interact() or self.busy() or not self.progress.unlocked(item):
             return
         if self.state == "sleep":
             self.wake(forced=True)
@@ -590,6 +617,8 @@ class Pet:
             self.last_pet_fun = now
             self.needs.apply({"diversao": 2})
             self.sfx("carinho")
+            self.progress.bump("carinhos")
+            self._xp_fx(self.progress.care("carinho"), sound=False)
             self.particles.append(Particle(
                 "heart", x=random.uniform(-0.5, 0.5) * self.sprite_w, y=-self.sprite_h * 0.95,
                 vx=random.uniform(-10, 10), vy=-35, life=1.4, size=self.s * 3))
@@ -636,6 +665,7 @@ class Pet:
             self._reversals.clear()
             if now >= self.dizzy_until:
                 self.sfx("tonto")
+                self.progress.bump("tonto")
             self.dizzy_until = now + 3.0
             self.needs.annoy(6)
             if now - self.last_shake_line > 6:
@@ -680,6 +710,8 @@ class Pet:
         key = "idle"
         if self.needs.sulking():
             key = "emburrado"
+        elif self.progress.presents and random.random() < 0.6:
+            key = "presente_esperando"
         elif (hour >= 22 or hour < 5) and random.random() < 0.4:
             key = "idle_noite"
         elif 6 <= hour < 10 and random.random() < 0.3:
@@ -700,6 +732,76 @@ class Pet:
         self.last_need[stat] = now
         normal, crit = NEED_LINES[stat]
         self.line(crit if critical else normal, "need_critical" if critical else "need")
+
+    # ---- progresso -------------------------------------------------------
+    def _on_progress(self, event: tuple) -> None:
+        kind = event[0]
+        if kind == "level":
+            _, level, unlocked = event
+            if unlocked:
+                self.line("desbloqueou", "reaction", nivel=level, itens=", ".join(i["nome"] for i in unlocked))
+            else:
+                self.line("subiu_nivel", "reaction", nivel=level)
+            self.happy_until = self.clock + 3.0
+            self.sfx("nivel")
+            if not self.hidden:
+                self._orbs(24, burst=True)
+        elif kind == "achievement":
+            self.on_achievement(event[1])
+        elif kind == "present":
+            if not self.hidden and self.state != "sleep":
+                self.line("achou_presente", "reaction")
+                self.sfx("pop")
+        elif kind == "losing":
+            self.line("perdendo_xp", "need")
+
+    def self_care(self, kind: str) -> None:
+        """Você apertou "Fiz!" no lembrete de água ou de pausa."""
+        gain = self.progress.self_care(kind)
+        self.happy_until = self.clock + 2.0
+        self.line(f"fiz_{kind}", "reaction")
+        self._xp_fx(gain)
+
+    def open_present(self) -> None:
+        result = self.progress.open_present()
+        if result is None:
+            return
+        what, qty = result
+        self.sfx("brilho")
+        self.happy_until = self.clock + 2.5
+        if what == "xp":
+            self.line("presente_xp", "reaction", xp=qty)
+            self._xp_fx(qty, sound=False)
+        else:
+            name = self.items.get(what)["nome"]
+            self.line("presente_item", "reaction", item=f"{qty}x {name}" if qty > 1 else name)
+        for _ in range(10):
+            self.particles.append(Particle(
+                "spark", x=-self.sprite_w * 0.9 + random.uniform(-10, 10), y=-random.uniform(4, 30) * self.s / 3,
+                vx=random.uniform(-40, 40), vy=random.uniform(-90, -30), life=0.8,
+                color=random.choice(("#FFF59D", "#FFD54F", "#FFFFFF", "#E53935")), size=self.s * 1.5))
+
+    def _xp_fx(self, amount: float, sound: bool = True) -> None:
+        """Bolinhas de XP e o "+N" subindo."""
+        if amount <= 0 or self.hidden:
+            return
+        if sound:
+            self.sfx("xp")
+        self._orbs(min(8, 2 + int(amount) // 5))
+        self.particles.append(Particle(
+            "note", x=self.sprite_w * 0.55, y=-self.sprite_h * 0.7, vy=-30, life=1.3,
+            text=f"+{int(amount)}", color="#B5F23A", size=8 + self.s * 2))
+
+    def _orbs(self, count: int, burst: bool = False) -> None:
+        for _ in range(count):
+            if burst:
+                ang, spd = random.uniform(0, math.tau), random.uniform(80, 260)
+            else:
+                ang, spd = random.uniform(math.pi * 1.1, math.pi * 1.9), random.uniform(40, 110)
+            self.particles.append(Particle(
+                "orb", x=random.uniform(-0.4, 0.4) * self.sprite_w, y=-self.sprite_h * random.uniform(0.3, 0.8),
+                vx=math.cos(ang) * spd, vy=math.sin(ang) * spd, life=random.uniform(0.7, 1.3),
+                color=random.choice(("#B5F23A", "#D7FF6B", "#7FD321")), size=self.s * random.choice((1.5, 2, 2.5))))
 
     # ---- partículas ------------------------------------------------------
     def _sweat(self) -> None:
@@ -843,4 +945,4 @@ class Pet:
 
     # ---- persistência ----------------------------------------------------
     def to_dict(self) -> dict:
-        return {"needs": self.needs.to_dict(), "x": self.x}
+        return {"needs": self.needs.to_dict(), "x": self.x, "progress": self.progress.to_dict()}

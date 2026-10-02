@@ -23,6 +23,7 @@ BUTTONS = [
 WIDTH = 270
 STATUS_W = 214
 BUBBLE_MAX_W = 236
+STICKY_SECONDS = 90   # quanto tempo o balão do lembrete com "Fiz!" fica voltando
 
 TOOLTIP_BG = QColor(18, 4, 22, 238)
 TOOLTIP_BORDER = QColor("#4B2A86")
@@ -52,6 +53,8 @@ class PetWindow(QWidget):
 
         self.bubble_text: str | None = None
         self.bubble_until = 0.0
+        self.sticky: tuple[str, str, float] | None = None   # lembrete com "Fiz!": (texto, tipo, até quando)
+        self.bubble_btn: QRect | None = None
         self.hover_since: float | None = None
         self.hover_lost: float | None = None
         self.hover_btn: str | None = None
@@ -69,7 +72,7 @@ class PetWindow(QWidget):
     def resize_for_scale(self) -> None:
         s = self.pet.s
         self.sw, self.sh = 16 * s, 40 * s
-        self.H = self.sh + 290
+        self.H = self.sh + 305
         self.setFixedSize(WIDTH, self.H)
         self.sync_position()
 
@@ -95,7 +98,15 @@ class PetWindow(QWidget):
         return [(bid, QRect(bar.x() + 4 + i * SLOT, bar.y() + 4, SLOT, SLOT)) for i, (bid, _) in enumerate(BUTTONS)]
 
     def status_height(self) -> int:
-        return 8 + 18 + 15 + len(STATS) * 15 + 6
+        return 8 + 18 + 15 + 15 + len(STATS) * 15 + 6
+
+    def gift_rect(self) -> QRect | None:
+        """Presente esperando pra ser aberto, no chão ao lado dele."""
+        pet = self.pet
+        if not self.app.progress.presents or pet.hidden or pet.state in ("dragged", "fall", "exploded"):
+            return None
+        g = 8 * pet.s
+        return QRect(int(WIDTH / 2 - self.sw / 2 - g - 6), self.H - g, g, g)
 
     def status_rect(self) -> QRect:
         h = self.status_height()
@@ -150,10 +161,16 @@ class PetWindow(QWidget):
         if not self.dragging:
             self.sync_position()
         self.update_hover()
-        if self.bubble_text and time.monotonic() > self.bubble_until:
+        now = time.monotonic()
+        if self.sticky and now > self.sticky[2]:
+            self.sticky = None
+        if self.bubble_text and now > self.bubble_until:
             self.bubble_text = None
         if self.pet.state == "exploded":
             self.bubble_text = None
+        elif not self.bubble_text and self.sticky:
+            # outra fala cobriu o lembrete; quando ela some, o lembrete com "Fiz!" volta
+            self.bubble_text, self.bubble_until = self.sticky[0], self.sticky[2]
         if desktop.needs_input_mask():
             self._update_mask()
         sig = self._signature()
@@ -167,18 +184,34 @@ class PetWindow(QWidget):
         if pet.particles:
             return None
         r = self.sprite_rect()
+        prog = self.app.progress
         status = None
         if self.status_visible():
             n = pet.needs
             status = (n.mood(), tuple(int(v // 5) for v in n.values.values()),
-                      tuple(n.active_effects()), self.app.settings.name)
+                      tuple(n.active_effects()), self.app.settings.name,
+                      prog.level, int(prog.fraction() * 129), prog.losing)
         return (pet.pose(), pet.hidden, pet.held, round(pet.tilt), round(r.x()), round(r.y()),
                 round(r.width()), round(r.height()), self.bubble_text, self.toolbar_visible(),
-                self.hover_btn, pet.state == "sleep", status)
+                self.hover_btn, pet.state == "sleep", status, prog.presents, self.sticky is None)
 
-    def show_bubble(self, text: str, seconds: float | None = None) -> None:
+    def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
+        """Mostra uma fala. Com `action` ("agua"/"pausa"), o balão ganha o botão "Fiz!" e volta
+        se outra fala o cobrir."""
         self.bubble_text = text
-        self.bubble_until = time.monotonic() + (seconds or max(3.5, min(9.0, 2.5 + len(text) / 13)))
+        if action:
+            self.sticky = (text, action, time.monotonic() + STICKY_SECONDS)
+            self.bubble_until = self.sticky[2]
+        else:
+            self.bubble_until = time.monotonic() + (seconds or max(3.5, min(9.0, 2.5 + len(text) / 13)))
+
+    def sticky_active(self) -> bool:
+        return self.sticky is not None and time.monotonic() < self.sticky[2]
+
+    def clear_sticky(self) -> None:
+        if self.sticky and self.bubble_text == self.sticky[0]:
+            self.bubble_text = None
+        self.sticky = None
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -193,6 +226,9 @@ class PetWindow(QWidget):
                 rects.append(self.status_rect())
         if self.bubble_text:
             rects.append(QRect(0, 0, WIDTH, self.toolbar_rect().top()))
+        gift = self.gift_rect()
+        if gift:
+            rects.append(gift.adjusted(-2, -12, 2, 0))
         for part in self.pet.particles:
             # a máscara também recorta o desenho no X11, então inclui cada partícula
             if part.kind == "boom":
@@ -224,6 +260,7 @@ class PetWindow(QWidget):
                 p.setPen(Qt.NoPen)
                 p.setBrush(QColor(0, 0, 0, int(60 * lift)))
                 p.drawEllipse(QRectF(cx - sw / 2, ground - 6, sw, 6))
+            self._draw_gift(p)
             self._draw_creeper(p)
 
         self._draw_particles(p)
@@ -263,6 +300,23 @@ class PetWindow(QWidget):
             p.restore()
         p.restore()
 
+    def _draw_gift(self, p: QPainter) -> None:
+        rect = self.gift_rect()
+        if not rect:
+            return
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(0, 0, 0, 50))
+        p.drawEllipse(QRectF(rect.x(), rect.bottom() - 3, rect.width(), 5))
+        p.drawImage(rect, icons.image("presente"))
+        count = self.app.progress.presents
+        if count > 1:
+            p.setFont(self.font_small)
+            text_rect = QRect(rect.right() - 18, rect.bottom() - 11, 22, 13)   # como a contagem de itens do jogo
+            p.setPen(QColor(0, 0, 0, 200))
+            p.drawText(text_rect.translated(1, 1), Qt.AlignRight | Qt.AlignVCenter, f"x{count}")
+            p.setPen(QColor("#FFFFFF"))
+            p.drawText(text_rect, Qt.AlignRight | Qt.AlignVCenter, f"x{count}")
+
     def _draw_particles(self, p: QPainter) -> None:
         pet = self.pet
         cx, gy = WIDTH / 2, self.H
@@ -301,9 +355,9 @@ class PetWindow(QWidget):
                 p.setBrush(QColor(255, 255, 255, int(230 * fade)))
                 p.drawEllipse(QPointF(x, y), r, r)
                 p.setBrush(Qt.NoBrush)
-            else:  # crumb, debris, sweat, spark
+            else:  # crumb, debris, sweat, spark, orb
                 color = QColor(part.color)
-                if part.kind in ("spark", "sweat"):
+                if part.kind in ("spark", "sweat", "orb"):
                     color.setAlpha(int(255 * fade))
                 if part.kind == "sweat":
                     color = QColor(100, 181, 246, int(255 * fade))
@@ -353,11 +407,27 @@ class PetWindow(QWidget):
         issues += [EFFECT_LABELS[e] for e in n.active_effects() if e in EFFECT_LABELS]
         if self.pet.state == "sleep":
             issues.insert(0, "dormindo")
+        if self.app.progress.presents:
+            issues.insert(0, "tem presente pra você")
+        if self.app.progress.losing:
+            issues.append("perdendo XP")
         p.setFont(self.font_small)
         p.setPen(QColor("#B9A6D6"))
         p.drawText(QRect(x0, y, r.width() - 20, 14), Qt.AlignLeft | Qt.AlignVCenter,
                    ", ".join(issues) if issues else "tudo certo")
         y += 16
+        # barra de XP verde, como a do Minecraft
+        prog = self.app.progress
+        p.setPen(QColor("#80FF20"))
+        p.drawText(QRect(x0, y, 64, 13), Qt.AlignLeft | Qt.AlignVCenter, f"Nível {prog.level}")
+        bar = QRect(x0 + 66, y + 3, 129, 7)
+        p.fillRect(bar.adjusted(-1, -1, 1, 1), QColor("#000000"))
+        p.fillRect(bar, QColor("#2A2A2A"))
+        fill = int(bar.width() * prog.fraction())
+        if fill:
+            p.fillRect(QRect(bar.x(), bar.y(), fill, bar.height()), QColor("#7FD321"))
+            p.fillRect(QRect(bar.x(), bar.y(), fill, 2), QColor("#B5F23A"))
+        y += 15
         for stat in STATS:
             p.setPen(QColor("#E0E0E0"))
             p.drawText(QRect(x0, y, 64, 13), Qt.AlignLeft | Qt.AlignVCenter, LABELS[stat])
@@ -383,6 +453,10 @@ class PetWindow(QWidget):
         fm = QFontMetrics(self.font_bubble)
         br = fm.boundingRect(QRect(0, 0, BUBBLE_MAX_W - 22, 1000), Qt.TextWordWrap, text)
         bw, bh = br.width() + 22, br.height() + 14
+        with_button = self.sticky is not None and text == self.sticky[0]
+        if with_button:
+            bw = max(bw, 92)
+            bh += 24
         lo, hi = self._visible_x_range()
         x = int(max(lo + 2, min(hi - bw - 2, (WIDTH - bw) / 2)))
         y = int(bottom - bh - 8)
@@ -400,6 +474,17 @@ class PetWindow(QWidget):
         p.setFont(self.font_bubble)
         p.setPen(black)
         p.drawText(QRect(x + 11, y + 7, br.width(), br.height()), Qt.TextWordWrap, text)
+        self.bubble_btn = None
+        if with_button:
+            btn = QRect(x + bw - 11 - 60, y + bh - 28, 60, 20)
+            self.bubble_btn = btn
+            p.fillRect(btn.adjusted(-1, -1, 1, 1), black)
+            self._bevel(p, btn, QColor("#7FB04A"), QColor("#B5E07A"), QColor("#3E6B1E"))
+            p.setFont(self.font_title)
+            p.setPen(QColor("#1E3A0C"))
+            p.drawText(btn.translated(1, 1), Qt.AlignCenter, "Fiz!")
+            p.setPen(white)
+            p.drawText(btn, Qt.AlignCenter, "Fiz!")
 
     # ---- mouse -----------------------------------------------------------
     def _button_at(self, pos: QPoint) -> str | None:
@@ -417,6 +502,13 @@ class PetWindow(QWidget):
         pos = e.position().toPoint()
         gpos = e.globalPosition().toPoint()
         if e.button() == Qt.LeftButton:
+            if self.bubble_text and self.bubble_btn and self.bubble_btn.contains(pos):
+                self.app.confirm_care()
+                return
+            gift = self.gift_rect()
+            if gift and gift.adjusted(-3, -3, 3, 3).contains(pos):
+                self.app.open_present()
+                return
             bid = self._button_at(pos)
             if bid:
                 rect = dict(self.button_rects())[bid]
@@ -427,6 +519,7 @@ class PetWindow(QWidget):
                 self.drag_offset = QPointF(self.pet.x - gpos.x(), self.pet.y - gpos.y())
             elif self.bubble_text:
                 self.bubble_text = None
+                self.sticky = None   # dispensou o lembrete (o "Fiz!" continua no menu por um tempo)
         elif e.button() == Qt.RightButton:
             self.app.show_context_menu(gpos)
 

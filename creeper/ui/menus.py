@@ -64,14 +64,25 @@ def _icon(name: str) -> QIcon:
 
 def fill_category(app, menu: QMenu, category: str) -> None:
     pet = app.pet
+    prog = app.progress
     enabled = pet.can_interact() and not pet.busy()
     for item in app.items.by_category[category]:
         label = item["nome"]
         tip = effects_text(item)
-        action = QAction(_icon(item["id"]), label, menu)
+        available = enabled
+        if not prog.unlocked(item):
+            label = f"??? (nível {item['nivel']})"
+            tip = "Ainda não desbloqueado"
+            available = False
+        elif (left := prog.stock(item)) is not None:
+            label = f"{label}  ×{left}"
+            if left == 0:
+                tip = "Acabou. Ganhe mais com presentes e subindo de nível."
+                available = False
+        action = QAction(_icon(item["id"] if prog.unlocked(item) else "menu"), label, menu)
         action.setToolTip(tip)
         action.setStatusTip(tip)
-        action.setEnabled(enabled)
+        action.setEnabled(available)
         if category == "atividades":
             action.triggered.connect(lambda _=False, i=item["id"]: app.pet.do_activity(i))
         else:
@@ -91,9 +102,22 @@ def fill_main(app, menu: QMenu, tray: bool = False) -> None:
     n = pet.needs
     menu.setToolTipsVisible(True)
 
-    header = menu.addAction(f"{app.settings.name} · {n.mood()}")
+    prog = app.progress
+    header = menu.addAction(f"{app.settings.name} · nível {prog.level} · {n.mood()}")
     header.setEnabled(False)
     menu.addSeparator()
+
+    care = app.pending_care()
+    if care:
+        act = menu.addAction(_icon("agua" if care == "agua" else "descansar"),
+                             "Fiz! (bebi água)" if care == "agua" else "Fiz! (fiz uma pausa)")
+        act.triggered.connect(app.confirm_care)
+    if prog.presents:
+        act = menu.addAction(_icon("presente"), "Abrir presente" + (f" ({prog.presents})" if prog.presents > 1 else ""))
+        act.setEnabled(not pet.hidden and not app.in_tray)   # abre na tela, pra você ver o que veio
+        act.triggered.connect(app.open_present)
+    if care or prog.presents:
+        menu.addSeparator()
 
     for category in ("comidas", "bebidas", "atividades"):
         sub = menu.addMenu(_icon(CATEGORY_ICONS[category]), CATEGORY_TITLES[category])
@@ -118,6 +142,7 @@ def fill_main(app, menu: QMenu, tray: bool = False) -> None:
         act = menu.addAction(_icon("bandeja"), "Recolher para a bandeja")
         act.triggered.connect(app.hide_to_tray)
 
+    _fill_achievements(app, menu.addMenu(_icon("xp"), f"Conquistas ({len(prog.done)}/{len(app.achievements)})"))
     _fill_settings(app, menu.addMenu("Configurações"))
     menu.addSeparator()
     act = menu.addAction("Sair")
@@ -140,6 +165,20 @@ def _check(menu: QMenu, label: str, checked: bool, on_toggle) -> None:
     act.setCheckable(True)
     act.setChecked(checked)
     act.toggled.connect(on_toggle)
+
+
+def _fill_achievements(app, menu: QMenu) -> None:
+    menu.setToolTipsVisible(True)
+    done = app.progress.done
+    for ach in sorted(app.achievements, key=lambda a: a["id"] not in done):   # feitas primeiro
+        finished = ach["id"] in done
+        act = menu.addAction(_icon(ach.get("icone", "xp")), ("✔ " if finished else "") + ach["nome"])
+        tip = ach.get("descricao", "")
+        if ach.get("xp"):
+            tip += f" (+{ach['xp']} XP)"
+        act.setToolTip(tip)
+        if not finished:
+            act.setEnabled(False)   # cinza: ainda falta
 
 
 def _fill_settings(app, menu: QMenu) -> None:

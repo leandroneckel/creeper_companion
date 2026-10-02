@@ -33,6 +33,7 @@ Só abre uma cópia por vez: rodar de novo apenas traz o creeper de volta da ban
 | Carregar | Clique e arraste; ao soltar ele cai. Chacoalhar deixa ele tonto |
 | Mandar pra bandeja | Botão de "recolher" na barra; clique no ícone da bandeja pra trazer de volta |
 | Acalmar quando estiver chiando | Faça carinho rápido antes de ele explodir |
+| Abrir presente | Clique no presente no chão ao lado dele (ou "Abrir presente" no menu) |
 
 ### Necessidades
 
@@ -49,6 +50,26 @@ no máximo fica de mau humor.
 Alguns itens têm efeitos: **café** (tira o sono, mas deixa agitado e atrapalha dormir), **carne podre**
 (enjoo), **leite** (cura enjoo e café), **maçã dourada** (fica brilhando, necessidades congeladas por
 10 min), **poção de velocidade**. E nunca traga um gato.
+
+### XP, níveis e presentes
+
+A barra verde no painel é o XP, como no Minecraft. Ele ganha XP:
+
+- com o **tempo junto** (app aberto e você usando o PC);
+- quando você **cuida dele** (comida, bebida, atividades, carinho), com um limite por hora;
+- com um **bônus** enquanto ele está bem cuidado;
+- quando **você se cuida**: os lembretes de água e de pausa vêm com um botão **Fiz!**.
+
+Se alguma necessidade fica crítica, ele vai **perdendo XP** aos poucos, mas nunca desce de nível.
+Os primeiros níveis saem em horas; depois, mais ou menos um por dia de uso.
+
+Cada nível novo traz um **presente**, e de vez em quando ele acha um sozinho. O presente aparece no chão
+ao lado dele (e ele fica por perto esperando você abrir). Dentro vem **maçã dourada**, **poção de
+velocidade** ou XP. Esses dois itens especiais têm quantidade (o número aparece no menu); os outros
+são infinitos.
+
+**Conquistas** (como "Tsss... BUM!" e "Uma semana juntos") aparecem num aviso no canto da tela e dão XP
+extra. A lista fica no menu, em **Conquistas**.
 
 ### Ele também cuida de você
 
@@ -89,8 +110,10 @@ Ele chia antes de explodir (no ritmo do pisca-pisca), mastiga, dá goles, às ve
 
 ## Personalizar
 
-- **Comidas, bebidas e atividades:** `content/itens.yaml`.
+- **Comidas, bebidas e atividades:** `content/itens.yaml`. Cada item pode ter um nível de desbloqueio
+  (`nivel`) e virar limitado (`limitado`); o começo do arquivo explica.
 - **Falas:** `content/falas.yaml`. Dá pra adicionar quantas quiser em cada situação.
+- **Conquistas:** `content/conquistas.yaml` (nome, meta, XP e ícone de cada uma).
 - **Dados salvos:** `%APPDATA%\CreeperCompanion\save.json` (Windows) ou
   `~/.config/creeper-companion/save.json` (Linux). Os sons gerados ficam em cache na pasta `sons/` ao lado.
 
@@ -102,6 +125,7 @@ creeper/
   app.py                liga tudo: laço principal, lembretes, bandeja, salvamento
   pet.py                comportamento: estados, reações, falas, partículas
   needs.py              necessidades, efeitos, humor
+  progress.py           XP, níveis, estoque, presentes e conquistas
   config.py             configurações e salvamento
   content.py            leitura dos YAML
   art/sprite.py         o creeper em pixel art (gerado por código) e suas expressões
@@ -110,6 +134,7 @@ creeper/
   sound/player.py       toca os sons: cache dos WAV, volume, mudo
   ui/pet_window.py      janela transparente, balão, barra de botões, painel, mouse
   ui/menus.py           menus estilo Minecraft
+  ui/toast.py           aviso "Conquista feita!" no canto da tela
   ui/tray.py            ícone da bandeja
   desktop/              integração com o sistema (Windows / Linux)
 content/                itens e falas (YAML)
@@ -131,6 +156,8 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 ## Próximos passos
 
-- XP, níveis e itens desbloqueáveis.
+- Coisas pra desbloquear com os níveis: guarda-roupa (chapéus, cores, rastros, creeper carregado),
+  poções, comidas e atividades novas, e comportamentos (vir quando chamado, brincar sozinho,
+  subir nas janelas, brincadeiras com você).
 - Executável único (`.exe` no Windows, AppImage no Linux).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).
