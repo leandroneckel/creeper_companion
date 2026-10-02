@@ -136,6 +136,7 @@ class Pet:
         self.occluder: tuple[float, float, float, float] | None = None   # esconde-esconde: o que o cobre
         self.ball = None                                        # a bolinha (ball.Ball), quando em jogo
         self.last_solo = -1e9
+        self.attention = False   # o mouse está em cima dele: para de andar e fica te olhando
 
         now = time.monotonic()
         self.last_chat = now
@@ -319,8 +320,17 @@ class Pet:
 
     # ---- estados ---------------------------------------------------------
     def _u_idle(self, dt: float) -> None:
+        if self.attention and self.needs["sono"] >= 8:
+            return   # você está com o mouse em cima: ele espera em vez de sair andando
         if self.t >= self.data.get("dur", 3.0):
             self.decide()
+
+    def roaming(self) -> bool:
+        """Está se deslocando pela tela (aí o painel e a barra de botões não aparecem)."""
+        st, d = self.state, self.data
+        return (st in ("walk", "come", "leap")
+                or (st == "fetch" and d.get("phase") != "wait")
+                or (st == "exercise" and d.get("kind") in ("caminhar", "correr", "porco", "gato")))
 
     def decide(self) -> None:
         n = self.needs
@@ -371,6 +381,9 @@ class Pet:
         return abs(target - self.x) < 1
 
     def _u_walk(self, dt: float) -> None:
+        if self.attention:   # o mouse chegou nele: para e olha pra você
+            self.set_state("idle", dur=random.uniform(2, 4))
+            return
         if self._walk_towards(self.data["target"], self.walk_speed(), dt):
             self.set_state("idle", dur=random.uniform(2, 6))
 

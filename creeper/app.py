@@ -393,11 +393,11 @@ class CompanionApp(QObject):
         self.save()
 
     # ---- ações -----------------------------------------------------------
-    def on_toolbar(self, bid: str, global_pos: QPoint) -> None:
+    def on_toolbar(self, bid: str) -> None:
         cats = {"comer": "comidas", "beber": "bebidas", "atividades": "atividades"}
         if bid in cats:
             self._popup = menus.category_menu(self, cats[bid])
-            self._popup.popup(global_pos)
+            self._popup_beside(self._popup)
         elif bid == "dormir":
             if self.pet.state == "sleep":
                 self.pet.wake(forced=True)
@@ -408,12 +408,25 @@ class CompanionApp(QObject):
         elif bid == "bandeja":
             self.hide_to_tray()
         elif bid == "menu":
-            self.show_context_menu(global_pos)
+            self.show_context_menu()
 
-    def show_context_menu(self, global_pos: QPoint) -> None:
+    def show_context_menu(self) -> None:
         self._popup = QMenu()
         menus.fill_main(self, self._popup)
-        self._popup.popup(global_pos)
+        self._popup_beside(self._popup)
+
+    def _popup_beside(self, menu: QMenu) -> None:
+        """Abre o menu do lado do creeper (e do painel/barra, se estiverem aparecendo), sem cobrir nada."""
+        ui = self.window.ui_rect()
+        size = menu.sizeHint()
+        screen = self.window.screen() or QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        x = ui.right() + 8
+        if x + size.width() > geo.right():          # não cabe à direita: abre à esquerda
+            x = ui.left() - 8 - size.width()
+        x = max(geo.left(), x)
+        y = max(geo.top(), min(ui.top(), geo.bottom() - size.height()))
+        menu.popup(QPoint(x, y))
 
     def pet_hug(self) -> None:
         self.pet.stroke()

@@ -121,8 +121,18 @@ class PetWindow(QWidget):
     # ---- estado de hover -------------------------------------------------
     def toolbar_allowed(self) -> bool:
         pet = self.pet
-        return (not self.dragging and pet.can_interact() and pet.jump == 0
+        return (not self.dragging and pet.can_interact() and pet.jump == 0 and not pet.roaming()
                 and pet.state not in ("hiss", "fall", "exploded"))
+
+    def ui_rect(self) -> QRect:
+        """O que está aparecendo dele (creeper + barra + painel), em coordenadas da tela.
+        Os menus abrem do lado disso, pra não cobrir nada."""
+        rect = self.sprite_rect().toAlignedRect()
+        if self.toolbar_visible():
+            rect = rect.united(self.toolbar_rect())
+            if self.status_visible():
+                rect = rect.united(self.status_rect())
+        return rect.translated(self.pos())
 
     def toolbar_visible(self) -> bool:
         return (self.toolbar_allowed() and self.hover_since is not None
@@ -140,6 +150,9 @@ class PetWindow(QWidget):
             if self.status_visible():
                 zone = zone.united(self.status_rect().adjusted(-8, -8, 8, 8))
         inside = zone.contains(local) and not self.pet.hidden
+        popup = self.app._popup
+        if popup is not None and popup.isVisible() and self.hover_since is not None:
+            inside = True   # com o menu aberto do lado, o painel continua aparecendo
         if inside:
             self.hover_lost = None
             if self.hover_since is None:
@@ -161,6 +174,7 @@ class PetWindow(QWidget):
         if not self.dragging:
             self.sync_position()
         self.update_hover()
+        self.pet.attention = self.hover_since is not None
         now = time.monotonic()
         if self.sticky and now > self.sticky[2]:
             self.sticky = None
@@ -650,8 +664,7 @@ class PetWindow(QWidget):
                 return
             bid = self._button_at(pos)
             if bid:
-                rect = dict(self.button_rects())[bid]
-                self.app.on_toolbar(bid, self.mapToGlobal(rect.bottomLeft()))
+                self.app.on_toolbar(bid)
                 return
             if self._on_sprite(pos):
                 self.press = (gpos, time.monotonic())
@@ -660,7 +673,7 @@ class PetWindow(QWidget):
                 self.bubble_text = None
                 self.sticky = None   # dispensou o lembrete (o "Fiz!" continua no menu por um tempo)
         elif e.button() == Qt.RightButton:
-            self.app.show_context_menu(gpos)
+            self.app.show_context_menu()
 
     def mouseMoveEvent(self, e) -> None:
         gpos = e.globalPosition().toPoint()

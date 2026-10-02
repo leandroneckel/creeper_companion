@@ -495,6 +495,33 @@ check(pet.state == "exercise" and pet.data.get("solo"), "brinca sozinho quando e
 run(30)
 check(pet.state != "exercise" and prog.care_budget == budget, "brincar sozinho não dá XP de cuidado")
 
+# ---- mouse em cima: ele para, e o menu abre do lado ------------------------------
+pet.set_state("walk", target=pet.x + (200 if pet.x < middle else -200))
+win.hover_since = time.monotonic()
+run(0.1)
+check(pet.state == "idle", "para de andar quando o mouse chega nele")
+pet.set_state("come", target=pet.x + 300)
+win.hover_since = time.monotonic() - 5
+check(not win.toolbar_visible(), "sem painel enquanto ele corre pela tela")
+pet.set_state("idle", dur=999)
+win.hover_since = time.monotonic() - 5
+win.frame()
+app.show_context_menu()
+popup = app._popup
+check(popup.isVisible() and win.status_visible() and not popup.geometry().intersects(win.ui_rect()),
+      "menu abre do lado, sem cobrir o painel")
+if SHOTS:
+    from PySide6.QtGui import QColor, QImage, QPainter  # noqa: E402
+    area = win.ui_rect().united(popup.geometry()).adjusted(-10, -10, 10, 10)
+    sheet = QImage(area.size(), QImage.Format_ARGB32)
+    sheet.fill(QColor("#5B8FC7"))
+    painter = QPainter(sheet)
+    painter.drawImage(win.pos() - area.topLeft(), win.grab().toImage())
+    painter.drawImage(popup.pos() - area.topLeft(), popup.grab().toImage())
+    painter.end()
+    sheet.save(str(SHOTS / "menu_do_lado.png"))
+popup.hide()
+
 for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
              "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe", "trovao",
              "quique", "risadinha", "poof"):
