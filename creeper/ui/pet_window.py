@@ -103,7 +103,7 @@ class PetWindow(QWidget):
     def gift_rect(self) -> QRect | None:
         """Presente esperando pra ser aberto, no chão ao lado dele."""
         pet = self.pet
-        if not self.app.progress.presents or pet.hidden or pet.state in ("dragged", "fall", "exploded"):
+        if not self.app.progress.presents or pet.hidden or pet.state in ("dragged", "fall", "exploded", "hide"):
             return None
         g = 8 * pet.s
         return QRect(int(WIDTH / 2 - pet.sprite_w / 2 - g - 6), self.H - g, g, g)
@@ -195,7 +195,8 @@ class PetWindow(QWidget):
                 round(r.width()), round(r.height()), self.bubble_text, self.toolbar_visible(),
                 self.hover_btn, pet.state == "sleep", status, prog.presents, self.sticky is None,
                 pet.ghost, pet.tool, round(pet.tool_angle), self.app.settings.hat,
-                int(pet.clock * 8) % 6 if self.app.settings.charged else 0)
+                int(pet.clock * 8) % 6 if self.app.settings.charged else 0,
+                self._occluder_rect().getRect() if pet.occluder else None)
 
     def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
         """Mostra uma fala. Com `action` ("agua"/"pausa"), o balão ganha o botão "Fiz!" e volta
@@ -254,6 +255,9 @@ class PetWindow(QWidget):
         region = QRegion()
         for r in rects:
             region = region.united(QRegion(r))
+        occluder = self._occluder_rect()
+        if occluder is not None:   # o clique na parte escondida tem que ir pra janela de verdade
+            region = region.subtracted(QRegion(occluder))
         self.setMask(region)
 
     # ---- desenho ---------------------------------------------------------
@@ -265,7 +269,11 @@ class PetWindow(QWidget):
         ground = self.H
 
         if not pet.hidden:
-            if pet.state not in ("dragged", "fall"):
+            p.save()
+            occluder = self._occluder_rect()
+            if occluder is not None:   # esconde-esconde: não desenha a parte "atrás" da janela/borda/chão
+                p.setClipRegion(QRegion(self.rect()).subtracted(QRegion(occluder)))
+            if pet.state not in ("dragged", "fall", "hide"):
                 lift = max(0.35, 1 - pet.jump / (pet.sprite_h * 0.5))
                 sw = pet.sprite_w * 1.05 * lift
                 p.setPen(Qt.NoPen)
@@ -275,6 +283,7 @@ class PetWindow(QWidget):
             self._draw_props(p, behind=True)
             self._draw_creeper(p)
             self._draw_props(p, behind=False)
+            p.restore()
 
         self._draw_particles(p)
 
@@ -286,7 +295,7 @@ class PetWindow(QWidget):
                 rect = self.status_rect()
                 self._draw_status(p, rect)
                 top = rect.top() - 4
-        if self.bubble_text and not pet.hidden:
+        if self.bubble_text and not pet.hidden and pet.state != "hide":
             self._draw_bubble(p, top)
         p.end()
 
@@ -337,6 +346,15 @@ class PetWindow(QWidget):
                         icons.image(pet.tool))
             p.restore()
         p.restore()
+
+    def _occluder_rect(self) -> QRect | None:
+        """O que cobre ele no esconde-esconde, em coordenadas da janela (ou None)."""
+        occ = self.pet.occluder
+        if not occ:
+            return None
+        left, top, right, bottom = occ
+        x0, y0 = self.pos().x(), self.pos().y()   # canto da janela na tela
+        return QRectF(left - x0, top - y0, right - left, bottom - top).toAlignedRect().intersected(self.rect())
 
     def _hat_rect(self, rect: QRectF, pose) -> QRectF | None:
         """Onde o chapéu fica: em cima da cabeça, descendo junto quando ele respira ou senta."""

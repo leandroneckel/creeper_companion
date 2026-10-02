@@ -446,3 +446,53 @@ desbloqueou_visual:
   - "Nível {nivel}! Ganhei {itens} pro guarda-roupa. Já tô usando!"
   - "Nível {nivel}! Olha meu visual novo: {itens}. Dá pra trocar no Guarda-roupa."
   - "Nível {nivel}! {itens}! Tô me sentindo o creeper mais estiloso do servidor."
+
+# ---- comportamentos aprendidos ----
+truque_chamar:
+  - "Nível {nivel}! Aprendi a vir quando você chama: 'Vem cá!' no menu, em Brincadeiras. Ou clique do meio no meu ícone da bandeja."
+truque_bolinha:
+  - "Nível {nivel}! Agora a gente pode brincar de bolinha! Tá em Brincadeiras. Joga longe que eu busco."
+truque_sozinho:
+  - "Nível {nivel}! Aprendi a brincar sozinho. Quando eu tiver feliz e sem nada pra fazer, vou me divertir por conta própria."
+truque_esconde:
+  - "Nível {nivel}! Esconde-esconde desbloqueado! Duvido você me achar. Tá em Brincadeiras."
+truque_janelas:
+  - "Nível {nivel}! Agora eu subo nas suas janelas! Se atrapalhar, dá pra desligar nas Configurações."
+chamado:
+  - "Tô indo!"
+  - "Chamou? Chegando!"
+  - "Já vou, já vou!"
+chamado_chegou:
+  - "Cheguei! O que foi?"
+  - "Oi! Precisa de mim?"
+  - "Tô aqui! Fiz o percurso em tempo recorde."
+bolinha_inicio:
+  - "Bolinha! Arrasta e joga ela que eu busco!"
+  - "Joga! Joga! Joga!"
+bolinha_trouxe:
+  - "Trouxe! De novo, de novo!"
+  - "Pega! Joga outra vez!"
+  - "Missão cumprida! Mais uma?"
+  - "Tá babada, mas tá aqui."
+bolinha_fim:
+  - "Ufa, cansei de correr. Guardei a bolinha."
+  - "Bolinha guardada. Foi divertido!"
+brincar_sozinho:
+  - "Ninguém tá olhando... vou me divertir um pouco."
+  - "Tédio? Eu? Nunca. Vou brincar."
+  - "Vou fazer alguma coisa legal. Pode continuar trabalhando."
+esconde_inicio:
+  - "Conta até dez! Sem espiar!"
+  - "Fecha os olhos! Vou me esconder..."
+  - "Esconde-esconde! Você tem 90 segundos pra me achar."
+esconde_achou:
+  - "Ahh, me achou!"
+  - "Como você me achou?! Eu tava camuflado!"
+  - "Tá, tá, você é bom nisso."
+esconde_ganhei:
+  - "Ganhei! Eu sou o mestre do esconde-esconde."
+  - "Você não me achou! Tava aqui o tempo todo."
+subiu_janela:
+  - "Daqui de cima a vista é melhor!"
+  - "Olha eu aqui na sua janela!"
+  - "Escalei! Bom, pulei. Dá no mesmo."

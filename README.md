@@ -96,6 +96,18 @@ Os níveis também liberam visuais, que ficam no menu **Guarda-roupa** (cada coi
 | 10, 19, 27 | Rastros ao andar: folhas, faíscas, corações |
 | 30 | **Creeper carregado**: aura elétrica, chega com raio e trovão (e explode maior) |
 
+### Brincadeiras e comportamentos
+
+E ele aprende coisas novas (no menu **Brincadeiras**; as duas automáticas dá pra desligar nas Configurações):
+
+| Nível | Aprende |
+|---|---|
+| 3 | **Vir quando chamado**: "Vem cá!" no menu, ou clique do meio no ícone da bandeja. Ele corre até o mouse (e aparece no monitor certo) |
+| 11 | **Bolinha**: arraste a bolinha e solte com força; ela quica pela tela e ele busca e traz de volta |
+| 17 | **Brincar sozinho**: feliz e à toa, de vez em quando ele dança, pula, pesca ou minera por conta própria |
+| 25 | **Esconde-esconde**: ele some e fica só um pedacinho aparecendo (na borda da tela, atrás de uma janela ou enterrado no chão). Clique nele em até 90 s. Ele espia e dá risadinhas pra ajudar |
+| 29 | **Subir nas janelas**: pula em cima das janelas abertas, anda pela borda e cai quando chega na ponta ou a janela fecha. Solto em cima de uma janela, ele pousa nela |
+
 **Conquistas** (como "Tsss... BUM!" e "Uma semana juntos") aparecem num aviso no canto da tela e dão XP
 extra. A lista fica no menu, em **Conquistas**.
 
@@ -133,6 +145,8 @@ Ele chia antes de explodir (no ritmo do pisca-pisca), mastiga, dá goles, às ve
 - O ícone na bandeja no GNOME depende da extensão **AppIndicator** (já vem ativa no Ubuntu).
   Sem ela, o creeper continua funcionando, só não dá pra recolher pra bandeja.
 - A detecção de inatividade usa o `org.gnome.Mutter.IdleMonitor` (GNOME) ou `xprintidle`.
+- Subir nas janelas e se esconder atrás delas usa o `wmctrl` (`sudo apt install wmctrl`) e só funciona no X11.
+  No Wayland ele não enxerga as outras janelas: continua usando as bordas da tela e o chão.
 - O som usa o servidor de áudio do sistema (PipeWire/PulseAudio, que já vêm no Ubuntu). Se o Qt não
   conseguir abrir o áudio, o creeper só fica mudo.
 
@@ -155,6 +169,9 @@ creeper/
   needs.py              necessidades, efeitos, humor
   progress.py           XP, níveis, estoque, presentes e conquistas
   cosmetics.py          guarda-roupa: chapéus, cores, rastros, creeper carregado
+  tricks.py             comportamentos que ele aprende (vir quando chamado, bolinha...)
+  surfaces.py           janelas abertas viram lugares pra subir e se esconder
+  ball.py               física da bolinha
   config.py             configurações e salvamento
   content.py            leitura dos YAML
   art/sprite.py         o creeper em pixel art (gerado por código) e suas expressões
@@ -164,6 +181,7 @@ creeper/
   ui/pet_window.py      janela transparente, balão, barra de botões, painel, mouse
   ui/menus.py           menus estilo Minecraft
   ui/toast.py           aviso "Conquista feita!" no canto da tela
+  ui/ball_window.py     a bolinha na tela (dá pra agarrar e arremessar)
   ui/tray.py            ícone da bandeja
   desktop/              integração com o sistema (Windows / Linux)
 content/                itens e falas (YAML)
@@ -185,7 +203,5 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 ## Próximos passos
 
-- Comportamentos pra desbloquear: vir quando chamado, brincar sozinho, subir nas janelas e
-  brincadeiras com você.
 - Executável único (`.exe` no Windows, AppImage no Linux).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).

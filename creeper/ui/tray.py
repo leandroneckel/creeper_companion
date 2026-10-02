@@ -27,6 +27,8 @@ class Tray(QSystemTrayIcon):
     def _on_activated(self, reason) -> None:
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
             self.app.toggle_visible()
+        elif reason == QSystemTrayIcon.MiddleClick:
+            self.app.call_pet()   # "Vem cá!" (se ele já aprendeu)
 
     def refresh(self) -> None:
         pet = self.app.pet

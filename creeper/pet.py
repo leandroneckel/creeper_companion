@@ -27,8 +27,14 @@ NEED_LINES = {
 }
 
 # Estados em que ele não aceita comida/atividades
-BUSY = {"eat", "drink", "exercise", "hiss", "exploded", "dragged", "fall"}
-NO_INTERACTION = {"hiss", "exploded", "dragged", "fall"}
+BUSY = {"eat", "drink", "exercise", "hiss", "exploded", "dragged", "fall", "leap", "come", "fetch", "hide"}
+NO_INTERACTION = {"hiss", "exploded", "dragged", "fall", "leap", "hide"}
+# Estados em que ele não fica preso ao chão (ou à janela onde está)
+AIRBORNE = {"dragged", "fall", "exploded", "leap", "hide"}
+# O que ele faz quando brinca sozinho (se já estiver desbloqueado)
+SOLO_ACTIVITIES = ("dancar", "pular", "correr", "minerar", "pescar", "plantar")
+SOLO_COOLDOWN = 10 * 60
+HIDE_SECONDS = 90
 
 GRAVITY = 2200.0
 
@@ -125,6 +131,11 @@ class Pet:
         self.hop: float | None = None  # tempo desde o início do pulo da poção de salto
         self._last_x = self.x
         self._trail_timer = 0.0
+        self.platforms: list[tuple[float, float, float]] = []   # bordas de janelas: (y, x1, x2)
+        self.perch: tuple[float, float, float] | None = None    # em cima de qual janela ele está
+        self.occluder: tuple[float, float, float, float] | None = None   # esconde-esconde: o que o cobre
+        self.ball = None                                        # a bolinha (ball.Ball), quando em jogo
+        self.last_solo = -1e9
 
         now = time.monotonic()
         self.last_chat = now
@@ -216,6 +227,19 @@ class Pet:
         m = self._margin()
         return max(left + m, min(right - m, x))
 
+    def _roam_bounds(self) -> tuple[float, float]:
+        """Até onde ele pode andar: a borda da janela onde está, ou a tela."""
+        if self.perch:
+            m = self.sprite_w / 2 + 6
+            lo, hi = self.perch[1] + m, self.perch[2] - m
+            return (lo, hi) if lo < hi else ((lo + hi) / 2, (lo + hi) / 2)
+        left, _, right, _ = self.world
+        return left + self._margin(), right - self._margin()
+
+    def _roam_x(self, x: float) -> float:
+        lo, hi = self._roam_bounds()
+        return max(lo, min(hi, x))
+
     def _needs_activity(self) -> str:
         if self.state == "sleep":
             return "sleep"
@@ -247,6 +271,8 @@ class Pet:
         getattr(self, f"_u_{self.state}")(dt)
         self._hop_tick(dt)
         self._trail_tick(dt)
+        if self.ball and self.ball.held == "pet" and self.state != "fetch":
+            self._drop_ball()   # foi interrompido com a bolinha na boca
 
         for event in self.progress.drain():
             self._on_progress(event)
@@ -264,9 +290,21 @@ class Pet:
 
     def _ground_check(self) -> None:
         left, top, right, ground = self.world
-        if self.state in ("dragged", "fall", "exploded"):
+        if self.state in AIRBORNE:
             return
         if self.state == "exercise" and self.data.get("kind") == "gato":
+            return
+        if self.perch:
+            # continua em cima da janela? (ela pode ter mexido, sumido ou ele andou até a ponta)
+            y0 = self.perch[0]
+            near = [p for p in self.platforms if p[1] <= self.x <= p[2] and abs(p[0] - y0) < 40]
+            if near:
+                self.perch = min(near, key=lambda p: abs(p[0] - y0))
+                self.y = self.perch[0]
+                self.x = self._clamp_x(self.x)
+                return
+            self.perch = None
+            self.set_state("fall", from_y=self.y)
             return
         if self.y < ground - 1:
             self.set_state("fall", from_y=self.y)
@@ -294,12 +332,28 @@ class Pet:
         if self.progress.presents:
             self.set_state("idle", dur=random.uniform(4, 8))  # espera você abrir o presente
             return
+        if (self.settings.solo_play and self.progress.knows("sozinho") and n.mood() == "feliz"
+                and n["energia"] > 50 and self.clock - self.last_solo > SOLO_COOLDOWN and random.random() < 0.2):
+            self.last_solo = self.clock
+            self.do_activity(random.choice([a for a in SOLO_ACTIVITIES if self.progress.unlocked(self.items.get(a))]),
+                             solo=True)
+            if self.state == "exercise":
+                return
+        if self.platforms and random.random() < 0.15:
+            spot = self._climb_spot()
+            if spot:
+                self.leap_to(*spot)
+                return
         r = random.random()
         if n["energia"] < 25 and r < 0.5:
             self.set_state("sit", dur=random.uniform(20, 45))
             return
         if r < 0.5:
-            target = self._clamp_x(self.x + random.uniform(-450, 450))
+            if self.perch and random.random() < 0.3:   # anda até a ponta da janela e cai
+                y, x1, x2 = self.perch
+                target = x2 + self.sprite_w if self.x > (x1 + x2) / 2 else x1 - self.sprite_w
+            else:
+                target = self._roam_x(self.x + random.uniform(-450, 450))
             if abs(target - self.x) > 20:
                 self.set_state("walk", target=target)
                 return
@@ -405,15 +459,14 @@ class Pet:
 
     def _x_caminhar(self, dt: float) -> None:
         if "target" not in self.data or self._walk_towards(self.data["target"], self.walk_speed() * 1.2, dt):
-            self.data["target"] = self._clamp_x(self.x + random.choice((-1, 1)) * random.uniform(150, 500))
+            self.data["target"] = self._roam_x(self.x + random.choice((-1, 1)) * random.uniform(150, 500))
         if self.t >= self.data["dur"]:
             self._finish_exercise()
 
     def _x_correr(self, dt: float) -> None:
-        left, _, right, _ = self.world
+        lo, hi = self._roam_bounds()   # de ponta a ponta (da tela ou da janela onde ele está)
         if "target" not in self.data or self._walk_towards(self.data["target"], self.walk_speed() * 3.2, dt):
-            m = self._margin()
-            self.data["target"] = right - m if self.x < (left + right) / 2 else left + m
+            self.data["target"] = hi if self.x < (lo + hi) / 2 else lo
         self.jump = abs(math.sin(self.t * 14)) * 4 * self.s / 3
         if self.clock - self.data.get("last_sweat", -1) > 0.45:
             self.data["last_sweat"] = self.clock
@@ -443,7 +496,7 @@ class Pet:
 
     def _x_dancar(self, dt: float) -> None:
         self.jump = abs(math.sin(self.t * 5)) * 7 * self.s / 3
-        self.x = self._clamp_x(self.x + math.cos(self.t * 2.5) * 40 * dt)
+        self.x = self._roam_x(self.x + math.cos(self.t * 2.5) * 40 * dt)
         if self.clock - self.data.get("last_note", -1) > 0.55:
             self.data["last_note"] = self.clock
             # passeia pela escala em passos curtos, pra soar como melodia
@@ -485,6 +538,8 @@ class Pet:
                 self._sweat()
             if self._walk_towards(edge, self.walk_speed() * 5, dt):
                 self.hidden = True
+                self.perch = None
+                self.y = self.world[3]   # fugiu da janela também: volta pelo chão
                 self.data.update(phase="longe", until=self.t + random.uniform(8, 12))
         elif phase == "longe":
             if self.t >= self.data["until"]:
@@ -649,7 +704,7 @@ class Pet:
     def _x_porco(self, dt: float) -> None:
         d = self.data
         if "target" not in d or self._walk_towards(d["target"], self.walk_speed() * 1.8, dt):
-            d["target"] = self._clamp_x(self.x + random.choice((-1, 1)) * random.uniform(150, 450))
+            d["target"] = self._roam_x(self.x + random.choice((-1, 1)) * random.uniform(150, 450))
         scale = self.s * 1.25
         frame = 1 + int(self.t * 6) % 2
         self.props = [Prop("big", f"porco_{frame}", size=scale, flip=self.facing < 0)]
@@ -715,7 +770,8 @@ class Pet:
         prog.collect("atividades", kind)
         if kind in ACTIVITY_COUNTERS:
             prog.bump(ACTIVITY_COUNTERS[kind])
-        self._xp_fx(prog.care("gato" if kind == "gato" else "atividade"))
+        if not self.data.get("solo"):
+            self._xp_fx(prog.care("gato" if kind == "gato" else "atividade"))
         self.jump = 0
         self.hidden = False
         self.set_state("idle", dur=random.uniform(3, 5))
@@ -741,6 +797,7 @@ class Pet:
     def explode(self) -> None:
         self.flash = self.swell = 0.0
         self.hidden = True
+        self.perch = None
         h = self.sprite_h
         charged = self.settings.charged   # creeper carregado explode maior, como no jogo
         skin = cosmetics.SKINS.get(self.settings.skin)
@@ -778,6 +835,7 @@ class Pet:
 
     def _u_fall(self, dt: float) -> None:
         left, top, right, ground = self.world
+        prev_y = self.y
         self.vy += GRAVITY * dt
         self.y += self.vy * dt
         self.x += self.vx * dt
@@ -786,6 +844,13 @@ class Pet:
             self.vx = -self.vx * 0.5
             self.x = max(left + self.sprite_w / 2, min(right - self.sprite_w / 2, self.x))
         self.tilt *= max(0.0, 1 - 6 * dt)
+        if self.vy > 0:   # caindo: pode pousar em cima de uma janela no caminho
+            for plat in self.platforms:
+                y, x1, x2 = plat
+                if x1 <= self.x <= x2 and prev_y <= y <= self.y and y < ground - 5:
+                    self.perch = plat
+                    ground = y
+                    break
         if self.y >= ground:
             self.y = ground
             height = ground - self.data.get("from_y", ground)
@@ -826,7 +891,8 @@ class Pet:
         self.set_state("eat" if food else "drink", item=item_id)
         self.sfx("pop")
 
-    def do_activity(self, act_id: str) -> None:
+    def do_activity(self, act_id: str, solo: bool = False) -> None:
+        """Começa uma atividade. solo=True: foi ele que quis (não dá XP de cuidado)."""
         item = self.items.get(act_id)
         if not self.can_interact() or self.busy() or not self.progress.unlocked(item):
             return
@@ -835,8 +901,10 @@ class Pet:
         if self.needs["energia"] < 15 and act_id not in ("descansar", "gato"):
             self.line("atividade_cansado", "reaction")
             return
-        self.set_state("exercise", kind=act_id, dur=float(item.get("duracao", 10)))
-        if act_id != "gato":
+        self.set_state("exercise", kind=act_id, dur=float(item.get("duracao", 10)), solo=solo)
+        if solo:
+            self.line("brincar_sozinho", "chat")
+        elif act_id != "gato":
             self.sfx("pop")
             self.line(f"inicio_{act_id}", "reaction")
 
@@ -870,6 +938,10 @@ class Pet:
             self.line("acordar_natural", "reaction")
 
     def poke(self) -> None:
+        if self.state == "hide":
+            if self.data.get("phase") == "escondido":
+                self._end_hide(found=True)   # achou!
+            return
         if not self.can_interact():
             return
         now = self.clock
@@ -931,10 +1003,11 @@ class Pet:
             self.line("carinho", "reaction")
 
     def start_drag(self) -> bool:
-        if self.state in ("exploded", "hiss") or self.hidden:
+        if self.state in ("exploded", "hiss", "hide") or self.hidden:
             return False
         if self.state == "sleep":
             self.wake(forced=True)
+        self.perch = None
         self.held = None
         self.jump = 0
         self.set_state("dragged")
@@ -1017,7 +1090,7 @@ class Pet:
         self.line(key)
 
     def _check_needs(self) -> None:
-        if self.state in ("sleep", "exploded", "hiss", "dragged", "fall", "eat", "drink") or self.hidden:
+        if self.state in ("sleep", "exploded", "hiss", "dragged", "fall", "eat", "drink", "hide", "leap") or self.hidden:
             return
         stat, value = self.needs.worst()
         if value >= 35:
@@ -1031,16 +1104,247 @@ class Pet:
         normal, crit = NEED_LINES[stat]
         self.line(crit if critical else normal, "need_critical" if critical else "need")
 
+    # ---- subir nas janelas -----------------------------------------------
+    def leap_to(self, x: float, y: float, perch=None, then: tuple | None = None) -> None:
+        """Pulo em arco até (x, y). perch = a janela onde vai ficar; then = (estado, dados) depois."""
+        self.set_state("leap", x0=self.x, y0=self.y, x1=x, y1=y, perch=perch, then=then,
+                       arc=max(30.0, (self.y - y) * 0.35 + 30), dur=0.55 + min(0.4, abs(self.y - y) / 1500))
+        self.perch = None
+        self.sfx("pulo")
+
+    def _u_leap(self, dt: float) -> None:
+        d = self.data
+        k = min(1.0, self.t / d["dur"])
+        self.x = d["x0"] + (d["x1"] - d["x0"]) * k
+        self.y = d["y0"] + (d["y1"] - d["y0"]) * k - math.sin(k * math.pi) * d["arc"]
+        if d["x1"] != d["x0"]:
+            self.facing = 1 if d["x1"] > d["x0"] else -1
+        if k < 1:
+            return
+        self.y = d["y1"]
+        self.perch = d["perch"]
+        self.squash = 0.6
+        self.sfx("pouso", 0.4)
+        then = d["then"]
+        if then:
+            self.set_state(then[0], **then[1])
+        else:
+            self.set_state("idle", dur=random.uniform(2, 5))
+            if self.perch:
+                self.progress.bump("janelas")
+                if random.random() < 0.4:
+                    self.line("subiu_janela")
+
+    def _climb_spot(self) -> tuple[float, float, tuple] | None:
+        """Uma janela aqui por cima onde dá pra pular (perto, nem alta demais, com espaço pro corpo)."""
+        left, top, right, _ = self.world
+        spots = []
+        for plat in self.platforms:
+            y, x1, x2 = plat
+            if not (60 <= self.y - y <= 450) or y - self.sprite_h - 10 < top:
+                continue
+            if x2 - x1 < self.sprite_w + 20 or x2 < left or x1 > right:
+                continue
+            tx = max(x1 + self.sprite_w / 2 + 6, min(x2 - self.sprite_w / 2 - 6, self.x))
+            if abs(tx - self.x) <= 300:
+                spots.append((tx, y, plat))
+        return random.choice(spots) if spots else None
+
+    def _get_down(self, then: tuple) -> bool:
+        """Se estiver em cima de uma janela, pula pro chão e depois faz `then`."""
+        if not self.perch:
+            return False
+        self.leap_to(self.x, self.world[3], None, then=then)
+        return True
+
+    # ---- vir quando chamado ------------------------------------------------
+    def call(self, x: float) -> None:
+        """Você chamou: ele corre até o x do mouse."""
+        if self.hidden or self.state in ("exploded", "dragged", "fall", "hiss", "hide", "leap"):
+            return
+        if self.state == "sleep":
+            self.wake()
+        self.held = None
+        self.line("chamado", "reaction")
+        if not self._get_down(("come", {"target": x})):
+            self.set_state("come", target=x)
+
+    def _u_come(self, dt: float) -> None:
+        self.jump = abs(math.sin(self.t * 14)) * 4 * self.s / 3
+        if self._walk_towards(self._clamp_x(self.data["target"]), self.walk_speed() * 3, dt):
+            self.jump = 0
+            self.set_state("idle", dur=4)
+            self.happy_until = self.clock + 2.0
+            self.line("chamado_chegou", "reaction")
+
+    # ---- bolinha ---------------------------------------------------------
+    def start_ball(self) -> None:
+        self.line("bolinha_inicio", "reaction")
+        if not self._get_down(("fetch", {"phase": "wait"})):
+            self.set_state("fetch", phase="wait")
+
+    def fetch(self) -> None:
+        """Você jogou a bolinha: ele vai buscar."""
+        if not self.ball or self.hidden or self.state in ("exploded", "dragged", "fall", "hiss", "hide", "leap"):
+            return
+        if self.state == "sleep":
+            self.wake()
+        if not self._get_down(("fetch", {"phase": "go"})):
+            self.set_state("fetch", phase="go")
+
+    def _u_fetch(self, dt: float) -> None:
+        b, d = self.ball, self.data
+        if not b or not b.active:
+            self.jump = 0
+            self.set_state("idle", dur=2)
+            return
+        phase = d["phase"]
+        if phase == "wait":
+            self.facing = 1 if b.x > self.x else -1
+            self.jump = abs(math.sin(self.t * 7)) * 4 * self.s / 3 if (self.t % 3) < 0.9 else 0.0   # ansioso
+            if b.held == "none" and not b.resting and abs(b.x - self.x) > 80:
+                d["phase"] = "go"    # a bolinha saiu rolando sozinha
+            elif self.t > 120:
+                self.end_ball()
+        elif phase == "go":
+            if b.held == "user":
+                self.jump = 0
+                self.set_state("fetch", phase="wait")
+                return
+            self._walk_towards(self._clamp_x(b.x), self.walk_speed() * 3.2, dt)
+            self.jump = abs(math.sin(self.t * 14)) * 3 * self.s / 3
+            if abs(b.x - self.x) < self.sprite_w * 0.7 and b.y > self.y - self.sprite_h * 0.45:
+                b.held = "pet"
+                self.held = "bola"
+                self.sfx("pop")
+                d.update(phase="back", target=self._clamp_x(b.thrown_from))
+        else:   # back: traz de volta pra perto de onde você jogou
+            self.jump = abs(math.sin(self.t * 12)) * 3 * self.s / 3
+            if self._walk_towards(d["target"], self.walk_speed() * 2.5, dt):
+                self.jump = 0
+                self._drop_ball()
+                self.needs.apply({"diversao": 4})
+                self.progress.bump("bolinha")
+                self._xp_fx(self.progress.care("carinho"), sound=False)
+                self.happy_until = self.clock + 2.0
+                self.line("bolinha_trouxe", "reaction")
+                self.set_state("fetch", phase="wait")
+
+    def _drop_ball(self) -> None:
+        if self.held == "bola":
+            self.held = None
+        if self.ball and self.ball.held == "pet":
+            self.ball.place(self.x + self.facing * (self.sprite_w * 0.6 + 12), self.y - self.sprite_h * 0.5 - self.jump)
+
+    def end_ball(self) -> None:
+        """Guarda a bolinha (ou ele cansou de brincar)."""
+        if self.held == "bola":
+            self.held = None
+        if self.ball:
+            self.ball.active = False
+        self.jump = 0
+        if self.state == "fetch":
+            self.set_state("idle", dur=3)
+        self.line("bolinha_fim", "reaction")
+
+    # ---- esconde-esconde ---------------------------------------------------
+    def hide_and_seek(self, windows: list) -> None:
+        """Começa o esconde-esconde. windows = janelas abertas (pra se esconder atrás delas)."""
+        if not self.can_interact() or self.busy():
+            return
+        if self.state == "sleep":
+            self.wake()
+        self.held = None
+        self.line("esconde_inicio", "reaction")
+        self.set_state("hide", phase="contar", windows=windows)
+
+    def _u_hide(self, dt: float) -> None:
+        d = self.data
+        if d["phase"] == "contar":
+            if self.t < 2.5:
+                return
+            self.sfx("poof")   # só o som: fumaça acompanharia ele e entregaria o esconderijo
+            spot = self._hide_spot(d["windows"])
+            self.perch = None
+            self.x, self.y, self.facing, self.occluder = spot["x"], spot["y"], spot["facing"], spot["occluder"]
+            d.update(phase="escondido", base_x=self.x, base_y=self.y, peek=spot["peek"],
+                     until=self.t + HIDE_SECONDS, giggle=self.t + random.uniform(10, 18), world=self.world)
+            return
+        # escondido: de vez em quando espia pra fora e dá uma risadinha
+        cycle = self.t % 4.0
+        lean = math.sin((cycle - 3.2) / 0.8 * math.pi) if cycle > 3.2 else 0.0
+        if d["peek"]:
+            self.x = d["base_x"] + d["peek"] * lean * self.sprite_w * 0.25
+        else:
+            self.y = d["base_y"] - lean * self.sprite_h * 0.12
+        if self.t >= d["giggle"]:
+            d["giggle"] = self.t + random.uniform(12, 20)
+            self.sfx("risadinha")
+        if self.t >= d["until"]:
+            self._end_hide(found=False)
+
+    def _hide_spot(self, windows: list) -> dict:
+        """Escolhe onde se esconder: atrás da borda da tela, atrás de uma janela ou enterrado no chão."""
+        left, top, right, ground = self.world
+        w, h, far = self.sprite_w, self.sprite_h, 5000.0
+        spots = [
+            dict(x=left - w * 0.15, y=ground, facing=1, peek=1, occluder=(left - far, top - far, left, ground + far)),
+            dict(x=right + w * 0.15, y=ground, facing=-1, peek=-1, occluder=(right, top - far, right + far, ground + far)),
+            dict(x=random.uniform(left + w * 2, right - w * 2), y=ground + h * 0.72, facing=random.choice((-1, 1)),
+                 peek=0, occluder=(left - far, ground, right + far, ground + far)),
+        ]
+        behind = []
+        for wl, wt, wr, wb in windows:
+            # janela que chega no chão e é alta o bastante pra ele caber atrás
+            if wb < ground - 4 or wt > ground - h - 10 or wr < left or wl > right:
+                continue
+            if wl > left + w * 1.5:
+                behind.append(dict(x=wl + w * 0.15, y=ground, facing=-1, peek=-1, occluder=(wl, wt, wr, wb)))
+            if wr < right - w * 1.5:
+                behind.append(dict(x=wr - w * 0.15, y=ground, facing=1, peek=1, occluder=(wl, wt, wr, wb)))
+        if behind and random.random() < 0.6:
+            return random.choice(behind)
+        return random.choice(spots)
+
+    def _end_hide(self, found: bool) -> None:
+        d = self.data
+        left, top, right, ground = d.get("world", self.world)
+        self.occluder = None
+        m = self._margin()
+        self.x = max(left + m, min(right - m, d.get("base_x", self.x)))
+        self.y = ground
+        self.squash = 0.6
+        self.set_state("idle", dur=3)
+        self.happy_until = self.clock + 2.5
+        self.sfx("pulo")
+        if found:
+            self.progress.bump("esconde")
+            self._xp_fx(self.progress.care("atividade"))
+            self.line("esconde_achou", "reaction")
+        else:
+            self.line("esconde_ganhei", "reaction")
+
+    def _poof(self) -> None:
+        self.sfx("poof")
+        for _ in range(10):
+            ang = random.uniform(0, math.tau)
+            self.particles.append(Particle(
+                "smoke", x=math.cos(ang) * self.sprite_w * 0.4, y=-self.sprite_h * 0.5 + math.sin(ang) * 20,
+                vx=math.cos(ang) * 60, vy=math.sin(ang) * 60 - 20, life=0.7, color="#E0E0E0", size=10 * self.s / 3))
+
     # ---- progresso -------------------------------------------------------
     def _on_progress(self, event: tuple) -> None:
         kind = event[0]
         if kind == "level":
             _, level, unlocked = event
-            visual = [u for u in unlocked if u.get("tipo")]
+            visual = [u for u in unlocked if u.get("tipo") in ("chapeu", "cor", "rastro", "carregado")]
+            learned = [u for u in unlocked if u.get("tipo") == "truque"]
             for u in visual:
                 self.wear(u["tipo"], u["id"])   # coisa nova do guarda-roupa já vem vestida
             names = ", ".join(i["nome"] for i in unlocked)
-            if visual and len(visual) == len(unlocked):
+            if learned:   # comportamento novo: explica como usar
+                self.line(f"truque_{learned[0]['id']}", "reaction", nivel=level)
+            elif visual and len(visual) == len(unlocked):
                 self.line("desbloqueou_visual", "reaction", nivel=level, itens=names)
             elif unlocked:
                 self.line("desbloqueou", "reaction", nivel=level, itens=names)
@@ -1311,6 +1615,16 @@ class Pet:
                 sit, bob, eyes, blush = 5, 0, "happy", True
             elif kind == "fogos":
                 eyes, ly, blush = "wide", -1, True
+        elif st == "leap":
+            eyes, mouth, lift_l, lift_r, bob = "wide", "o", 2, 2, 0
+        elif st in ("come", "fetch"):
+            eyes, blush = "happy", True
+            if st == "come" or self.data.get("phase") != "wait":   # correndo
+                phase = (clock * 7.0) % 1.0
+                lift_l, lift_r = (2, 0) if phase < 0.5 else (0, 2)
+        elif st == "hide":
+            eyes = "glint" if self.data.get("phase") == "escondido" else "closed"
+            mouth = "smile"
 
         if clock < self.happy_until and st not in ("sleep", "hiss"):
             eyes, blush = "happy", True

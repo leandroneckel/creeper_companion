@@ -706,6 +706,36 @@ ICONS["raio"] = ([
     "............",
 ], {"b": "#4FC3F7", "B": "#E1F5FE"})
 
+# Brincadeiras
+ICONS["bola"] = ([
+    "............",
+    "....rrrr....",
+    "..rrwwrrrr..",
+    ".rrwwrrrrrR.",
+    ".rwwrrrrrrR.",
+    ".rrrrrrrrrR.",
+    ".rrrrrrrrRR.",
+    ".RrrrrrrRRR.",
+    "..RRrrrRRR..",
+    "...RRRRRR...",
+    "............",
+    "............",
+], {"r": "#E53935", "R": "#A61C1C", "w": "#FFCDD2"})
+ICONS["olho"] = ([
+    "............",
+    "............",
+    "............",
+    "....wwww....",
+    "..wwwwwwww..",
+    ".wwwbbbbwww.",
+    "wwwbbkkbbwww",
+    "wwwbbkkbbwww",
+    ".wwwbbbbwww.",
+    "..wwwwwwww..",
+    "....wwww....",
+    "............",
+], {"w": "#FAFAFA", "b": "#4CAF50", "k": "#111111"})
+
 # Variações de desenhos que já existem
 ICONS["sopa_beterraba"] = (ICONS["ensopado"][0], {"s": "#B71C1C", "R": "#E57373", "b": "#8D6E63", "w": "#5D4037"})
 ICONS["cenoura_dourada"] = (ICONS["cenoura"][0], {"o": "#FFCA28", "O": "#C79100", "g": "#FFE082", "G": "#FFB300"})

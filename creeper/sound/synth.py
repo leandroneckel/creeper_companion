@@ -508,6 +508,30 @@ def thunder(rng) -> list:
     return fade([math.tanh(1.5 * v / top) for v in out], 0.001, 0.15)
 
 
+def bounce(rng) -> list:
+    """Bolinha quicando: 'tum' de borracha."""
+    dur = 0.14
+    s = osc(dur, lambda u: 230 * (120 / 230) ** min(1.0, u * 1.5))
+    tap = mul(svf(noise(dur, rng), 1200, 0.8, "low"), decay_env(dur, 0.001, 0.012))
+    return add_at(mul(s, decay_env(dur, 0.002, 0.04)), tap, 0.0, 0.6)
+
+
+def giggle(rng) -> list:
+    """Risadinha escondida: 'hi-hi-hi' agudinho (a dica de onde ele está)."""
+    out: list = []
+    for i, f in enumerate((880, 990, 930)):
+        src = osc(0.09, lambda u, f=f: f * (1 + 0.15 * u), "saw")
+        voice = svf(src, 1800, 3, "band")
+        add_at(out, mul(voice, ar_env(0.09, 0.01, 0.04)), i * 0.13, 1 - i * 0.15)
+    return out
+
+
+def poof(rng) -> list:
+    """Sumiu: sopro de fumaça."""
+    dur = 0.35
+    return mul(svf(noise(dur, rng), lambda u: 2500 - 1800 * u, 0.7, "low"), ar_env(dur, 0.03, 0.25))
+
+
 def dig(rng) -> list:
     """Cavar: baque abafado de terra."""
     dur = 0.16
@@ -556,6 +580,9 @@ SOUNDS = {
     "cresce": (lambda rng: slide(rng, 250, 900), -19),
     "cavar": (dig, -20),
     "trovao": (thunder, -12),
+    "quique": (bounce, -19),
+    "risadinha": (giggle, -21),
+    "poof": (poof, -20),
 }
 
 

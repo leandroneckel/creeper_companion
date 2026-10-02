@@ -50,6 +50,9 @@ class Settings:
     skin: str = ""
     trail: str = ""
     charged: bool = False
+    # comportamentos (só valem depois de desbloqueados)
+    solo_play: bool = True         # brinca sozinho quando está feliz
+    climb: bool = True             # sobe nas janelas abertas
 
     @classmethod
     def from_dict(cls, data: dict) -> "Settings":

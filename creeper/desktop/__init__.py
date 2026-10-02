@@ -8,6 +8,7 @@ Cada plataforma expõe as mesmas funções:
     fullscreen_app_active()   -> True se algum app estiver em tela cheia
     autostart_enabled() / set_autostart(bool)
     needs_input_mask()        -> True se precisar de máscara para clicar através
+    window_rects()            -> janelas abertas (só posição e tamanho), da de cima pra de baixo
 """
 import sys
 

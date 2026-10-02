@@ -6,7 +6,8 @@ from PySide6.QtCore import QElapsedTimer, QObject, QPoint, Qt, QTimer
 from PySide6.QtGui import QCursor, QGuiApplication
 from PySide6.QtWidgets import QInputDialog, QMenu, QSystemTrayIcon
 
-from . import desktop
+from . import desktop, surfaces
+from .ball import Ball
 from .config import Settings, load_save, write_save
 from .content import load_content
 from .needs import Needs
@@ -15,6 +16,7 @@ from .progress import Progress
 from .sound.player import Sounds
 from .ui import menus
 from .ui.pet_window import PetWindow
+from .ui.ball_window import BallWindow
 from .ui.toast import Toast
 from .ui.tray import Tray
 
@@ -72,6 +74,10 @@ class CompanionApp(QObject):
 
         self.window = PetWindow(self)
         self.toast = Toast()
+        self.ball = Ball()
+        self.ball.on_bounce = lambda strength: self.play_sound("quique", 0.3 + 0.7 * strength)
+        self.pet.ball = self.ball
+        self.ball_window = BallWindow(self.ball, self.on_ball_thrown)
         self.tray = Tray(self)
         self.tray.show()
 
@@ -85,7 +91,8 @@ class CompanionApp(QObject):
         self._clock.start()
         self._last_ms = 0
         self._timers = []
-        for ms, slot in ((FRAME_MS, self.tick), (2000, self.slow_tick), (30000, self.care_tick), (60000, self.save)):
+        for ms, slot in ((FRAME_MS, self.tick), (2000, self.slow_tick), (30000, self.care_tick), (60000, self.save),
+                         (1000, self.refresh_platforms)):
             timer = QTimer(self)
             if ms == FRAME_MS:
                 timer.setTimerType(Qt.PreciseTimer)  # o timer padrão do Windows arredonda pra ~21 fps
@@ -142,13 +149,20 @@ class CompanionApp(QObject):
         self._update_world()
         self.pet.update(dt)
         self.window.frame()
+        if self.ball.active:
+            geo = self._screen_for(self.ball.x, self.ball.y).availableGeometry()
+            self.ball.world = (geo.left(), geo.top(), geo.right() + 1, geo.bottom() + 1)
+            self.ball.update(min(dt, 0.05))
+        self.ball_window.sync(self.window.isVisible())
         self._adapt_frame_rate()
 
     def _adapt_frame_rate(self) -> None:
         """30 fps quando ele está se mexendo; bem menos quando está parado."""
         pet, win = self.pet, self.window
-        moving = (pet.state in ("walk", "exercise", "hiss", "dragged", "fall", "eat", "drink", "exploded")
-                  or pet.jump > 0 or pet.squash > 0 or pet.size != pet.size_target or win.dragging)
+        moving = (pet.state in ("walk", "exercise", "hiss", "dragged", "fall", "eat", "drink", "exploded",
+                                "leap", "come", "fetch", "hide")
+                  or pet.jump > 0 or pet.squash > 0 or pet.size != pet.size_target or win.dragging
+                  or (self.ball.active and not self.ball.resting))
         if not win.isVisible():
             ms = 250
         elif moving or win.hover_since is not None:
@@ -169,7 +183,37 @@ class CompanionApp(QObject):
                 self.apply_visibility()
         if self.window.isVisible() and not self.window.dragging:
             desktop.keep_on_top(self.window)
+            if self.ball_window.isVisible():
+                desktop.keep_on_top(self.ball_window)
         self.tray.refresh()
+
+    def refresh_platforms(self) -> None:
+        """Bordas das janelas abertas onde ele pode subir (se já aprendeu e está ligado)."""
+        pet = self.pet
+        if self.settings.climb and self.progress.knows("janelas") and self.window.isVisible():
+            pet.platforms = surfaces.platforms(surfaces.windows())
+        else:
+            pet.platforms = []
+        timer = self._timers[4]
+        ms = 300 if pet.perch else 1000   # em cima de uma janela, confere mais vezes (ela pode mexer)
+        if timer.interval() != ms:
+            timer.setInterval(ms)
+
+    def _bring_to_screen(self, x: float, y: float) -> None:
+        """Se (x, y) está em outro monitor, ele 'aparece' lá (não dá pra andar entre telas)."""
+        target = self._screen_for(x, y)
+        if target == self._screen_for(self.pet.x, self.pet.y):
+            return
+        geo = target.availableGeometry()
+        pet = self.pet
+        if pet.state not in ("idle", "walk", "sit", "sleep", "fetch", "come"):
+            return
+        pet.perch = None
+        pet.set_state("idle", dur=2)
+        pet.x = float(max(geo.left() + 80, min(geo.right() - 80, x)))
+        pet.y = float(geo.bottom() + 1)
+        self._update_world()
+        pet.sfx("poof")
 
     def care_tick(self) -> None:
         """XP pelo tempo junto e lembretes pra você: água, pausas e hora de dormir."""
@@ -218,6 +262,38 @@ class CompanionApp(QObject):
 
     def open_present(self) -> None:
         self.pet.open_present()
+
+    # ---- brincadeiras ----------------------------------------------------
+    def call_pet(self) -> None:
+        """'Vem cá!': ele corre até o mouse (aparece no monitor certo, se precisar)."""
+        if not self.progress.knows("chamar"):
+            return
+        if self.in_tray:
+            self.show_from_tray()
+        pos = QCursor.pos()
+        self._bring_to_screen(pos.x(), pos.y())
+        self.pet.call(pos.x())
+
+    def toggle_ball(self) -> None:
+        if self.ball.active:
+            self.pet.end_ball()
+            return
+        if not self.progress.knows("bolinha") or not self.pet.can_interact() or self.pet.busy():
+            return
+        pet = self.pet
+        self.ball.place(pet.x + pet.facing * (pet.sprite_w * 0.6 + 14), pet.y - pet.sprite_h * 0.6)
+        self.ball.thrown_from = pet.x
+        pet.start_ball()
+
+    def on_ball_thrown(self) -> None:
+        self._bring_to_screen(self.ball.x, self.ball.y)
+        self.pet.fetch()
+
+    def start_hide(self) -> None:
+        if self.progress.knows("esconde"):
+            if self.ball.active:
+                self.pet.end_ball()
+            self.pet.hide_and_seek(surfaces.windows())
 
     def set_outfit(self, kind: str, value) -> None:
         """Guarda-roupa: kind = "chapeu" | "cor" | "rastro" | "carregado"."""
@@ -355,6 +431,8 @@ class CompanionApp(QObject):
             self.apply_visibility()
         if key in ("sound", "sound_volume"):
             self.play_sound("pop")  # amostra do volume escolhido
+        if key == "climb":
+            self.refresh_platforms()   # desligou: ele desce da janela na hora
         self.save()
 
     def autostart_enabled(self) -> bool:

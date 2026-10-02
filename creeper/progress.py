@@ -7,7 +7,7 @@ import random
 import time
 from datetime import date, timedelta
 
-from . import cosmetics
+from . import cosmetics, tricks
 
 # Fontes de XP
 TIME_XP_PER_MIN = 1.0        # app aberto e você usando o PC
@@ -73,7 +73,8 @@ class Progress:
             self.xp -= self.needed
             self.level += 1
             self.presents += 1           # todo nível traz um presente
-            unlocked = [i for i in self.items.all() + cosmetics.UNLOCKS if i.get("nivel") == self.level]
+            unlocked = [i for i in self.items.all() + cosmetics.UNLOCKS + tricks.UNLOCKS
+                        if i.get("nivel") == self.level]
             self.events.append(("level", self.level, unlocked))
             self.record("nivel", self.level)
 
@@ -139,6 +140,10 @@ class Progress:
     # ---- itens e presentes -----------------------------------------------
     def unlocked(self, item: dict) -> bool:
         return int(item.get("nivel", 1)) <= self.level
+
+    def knows(self, trick: str) -> bool:
+        """Já aprendeu esse comportamento (tricks.TRICKS)?"""
+        return self.level >= tricks.TRICKS[trick]["nivel"]
 
     def stock(self, item: dict) -> int | None:
         """Quantas unidades tem, ou None se o item é infinito."""

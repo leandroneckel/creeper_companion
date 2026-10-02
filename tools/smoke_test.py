@@ -44,6 +44,9 @@ def run(seconds: float, dt: float = 0.033) -> None:
     for _ in range(int(seconds / dt)):
         pet.update(dt)
         win.frame()
+        if app.ball.active:
+            app.ball.update(dt)
+        app.ball_window.sync(win.isVisible())
 
 
 def shot(name: str, hover: bool = True) -> None:
@@ -363,8 +366,138 @@ shot("carregado_raio", hover=False)
 run(1)
 shot("carregado", hover=False)
 
+# ---- comportamentos e brincadeiras ----------------------------------------------
+prog.level = 1
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+play_menu = next(a.menu() for a in main_menu.actions() if a.text() == "Brincadeiras")
+check(all(not a.isEnabled() for a in play_menu.actions()), "brincadeiras trancadas no nível 1")
+app.call_pet()
+check(pet.state != "come", "não vem quando chamado antes de aprender")
+
+prog.level = 30
+for kind, value in (("carregado", False), ("chapeu", ""), ("rastro", ""), ("cor", "")):
+    app.set_outfit(kind, value)
+pet.needs.effects.clear()
+pet.needs.values.update(fome=90, sede=90, energia=90, sono=90, diversao=90)
+pet.needs.sulk_until = 0
+pet.set_state("idle", dur=999)
+run(0.5)
+left, top, right, ground = pet.world
+middle = (left + right) / 2
+
+said0 = len(said)
+pet.call(pet.x + 250 if pet.x < middle else pet.x - 250)
+target = pet._clamp_x(pet.data["target"])
+run(4)
+check(pet.state == "idle" and abs(pet.x - target) < 2 and len(said) >= said0 + 2, "vem correndo quando chamado")
+
+plat = (ground - 220.0, pet.x - 200, pet.x + 200)
+pet.platforms = [plat]
+spot = pet._climb_spot()
+check(spot is not None, "acha uma janela pra subir")
+pet.leap_to(*spot)
+run(1.5)
+check(pet.perch == plat and abs(pet.y - plat[0]) < 1, "pula e fica em cima da janela")
+shot("em_cima_da_janela", hover=False)
+pet.platforms = []          # a janela fechou
+run(1.5)
+check(pet.perch is None and abs(pet.y - ground) < 1, "cai quando a janela some")
+pet.platforms = [plat]
+pet.start_drag()
+pet.drag_to(pet.x, plat[0] - 150)
+pet.end_drag()
+run(1.5)
+check(pet.perch == plat, "solto em cima de uma janela, pousa nela")
+pet.platforms = []
+run(1.5)
+
+app.ball.world = pet.world
+app.toggle_ball()
+run(0.5)
+check(app.ball.active and pet.state == "fetch", "bolinha em jogo")
+fetched = prog.counters.get("bolinha", 0)
+app.ball.held = "user"
+app.ball.x, app.ball.y = pet.x, pet.y - 80
+app.ball.throw(900 if pet.x < middle else -900, -700)
+app.on_ball_thrown()
+carried = False
+for _ in range(int(20 / 0.033)):
+    run(0.033)
+    if pet.held == "bola" and not carried:
+        carried = True
+        shot("bolinha_na_boca", hover=False)
+    if prog.counters.get("bolinha", 0) > fetched:
+        break
+check(carried and prog.counters.get("bolinha", 0) == fetched + 1, "busca a bolinha e traz de volta")
+check("quique" in sounds, "bolinha quica")
+app.toggle_ball()
+run(0.3)
+check(not app.ball.active and pet.state != "fetch" and not app.ball_window.isVisible(), "guarda a bolinha")
+
+from PySide6.QtCore import QPoint, Qt  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
+
+app.toggle_ball()
+run(0.5)
+bw = app.ball_window
+center = QPoint(bw.width() // 2, bw.height() // 2)
+QTest.mousePress(bw, Qt.LeftButton, Qt.NoModifier, center)
+for step in range(1, 6):
+    QTest.mouseMove(bw, center + QPoint(step * 12, -step * 6))
+QTest.mouseRelease(bw, Qt.LeftButton, Qt.NoModifier, center + QPoint(72, -36))
+check(app.ball.held == "none" and abs(app.ball.vx) > 100 and pet.data.get("phase") == "go",
+      "agarrar e arremessar a bolinha com o mouse")
+app.toggle_ball()
+run(0.3)
+
+app.start_hide()
+run(3)
+check(pet.state == "hide" and pet.data["phase"] == "escondido" and pet.occluder is not None, "se esconde")
+pet.data["giggle"] = pet.t   # a risadinha (dica de onde ele está) viria em 10-18 s
+run(0.1)
+found0 = prog.counters.get("esconde", 0)
+pet.poke()
+run(0.5)
+check(pet.state != "hide" and pet.occluder is None and prog.counters.get("esconde", 0) == found0 + 1
+      and abs(pet.y - pet.world[3]) < 1, "clicar nele = achou")
+said0 = len(said)
+app.start_hide()
+run(3)
+pet.data["until"] = pet.t
+run(0.2)
+check(pet.state != "hide" and len(said) > said0 + 1, "se não achar a tempo, ele ganha")
+window_rect = (left + 300.0, ground - 400.0, left + 700.0, ground)
+spots = [pet._hide_spot([window_rect]) for _ in range(40)]
+check(any(s["occluder"] == window_rect for s in spots), "se esconde atrás de uma janela")
+for name, spot in (("tela", spots[0] if spots[0]["peek"] else None), ("chao", None), ("janela", None)):
+    pick = {"tela": lambda s: s["peek"] and s["occluder"] != window_rect, "chao": lambda s: not s["peek"],
+            "janela": lambda s: s["occluder"] == window_rect}[name]
+    spot = next((s for s in spots if pick(s)), None)
+    if spot:
+        pet.set_state("hide", phase="escondido", base_x=spot["x"], base_y=spot["y"], peek=spot["peek"],
+                      until=pet.t + 99, giggle=pet.t + 99, world=pet.world, windows=[])
+        pet.x, pet.y, pet.facing, pet.occluder = spot["x"], spot["y"], spot["facing"], spot["occluder"]
+        win.frame()
+        shot(f"escondido_{name}", hover=False)
+pet._end_hide(found=True)
+run(0.5)
+
+prog.presents = 0   # com presente esperando ele fica parado esperando você abrir
+budget = prog.care_budget
+for _ in range(300):
+    pet.set_state("idle", dur=0)
+    pet.last_solo = -1e9
+    pet.decide()
+    if pet.state == "exercise" and pet.data.get("solo"):
+        break
+check(pet.state == "exercise" and pet.data.get("solo"), "brinca sozinho quando está feliz")
+run(30)
+check(pet.state != "exercise" and prog.care_budget == budget, "brincar sozinho não dá XP de cuidado")
+
 for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
-             "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe", "trovao"):
+             "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe", "trovao",
+             "quique", "risadinha", "poof"):
     check(name in sounds, f"som '{name}' tocou")
 check(any(n.startswith("nota_") for n in sounds), "dançar toca notas")
 

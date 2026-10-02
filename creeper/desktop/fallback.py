@@ -32,3 +32,7 @@ def autostart_enabled() -> bool:
 
 def set_autostart(enabled: bool) -> None:
     pass
+
+
+def window_rects() -> list[tuple[int, int, int, int]]:
+    return []

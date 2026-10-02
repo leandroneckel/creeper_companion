@@ -162,3 +162,51 @@ def set_autostart(enabled: bool) -> None:
                 winreg.DeleteValue(key, RUN_VALUE)
             except FileNotFoundError:
                 pass
+
+
+# ---- janelas abertas (pra ele subir nelas e se esconder atrás) ----------------
+dwmapi = ctypes.WinDLL("dwmapi")
+DWMWA_EXTENDED_FRAME_BOUNDS = 9
+DWMWA_CLOAKED = 14
+WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+user32.IsIconic.argtypes = [wintypes.HWND]
+user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+dwmapi.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+
+
+def window_rects() -> list[tuple[int, int, int, int]]:
+    """Janelas normais visíveis nesta área de trabalho (sem as nossas), da de cima pra de baixo.
+
+    Só posição e tamanho, em pixels físicos: (esquerda, topo, direita, base).
+    """
+    own = os.getpid()
+    found: list[tuple[int, int, int, int]] = []
+    name = ctypes.create_unicode_buffer(256)
+
+    def visit(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd) or not user32.GetWindowTextLengthW(hwnd):
+            return True
+        if user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW:
+            return True
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value == own:
+            return True
+        user32.GetClassNameW(hwnd, name, 256)
+        if name.value in SHELL_CLASSES:
+            return True
+        cloaked = ctypes.c_int(0)   # "escondida" pelo Windows (outra área de trabalho, app suspenso)
+        dwmapi.DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, ctypes.byref(cloaked), ctypes.sizeof(cloaked))
+        if cloaked.value:
+            return True
+        rect = wintypes.RECT()   # sem a borda invisível de redimensionar
+        if dwmapi.DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(rect), ctypes.sizeof(rect)):
+            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        if rect.right - rect.left >= 80 and rect.bottom - rect.top >= 40:
+            found.append((rect.left, rect.top, rect.right, rect.bottom))
+        return True
+
+    user32.EnumWindows(WNDENUMPROC(visit), 0)
+    return found

@@ -6,6 +6,7 @@
 #   maca_dourada, tudo_cheio (todas as necessidades acima de 90), agua_feita, pausas_feitas
 #   (você apertou "Fiz!"), agua_seguidos (dias seguidos bebendo água), dias_juntos, nivel,
 #   blocos (minerados), diamantes, peixes, tesouros (pescados), plantou, porco, fogos, pocoes_diferentes
+#   bolinha (vezes que trouxe), esconde (vezes que você achou ele), janelas (vezes que subiu numa)
 # "icone" é um dos ícones de creeper/art/icons.py.
 
 conquistas:
@@ -232,3 +233,27 @@ conquistas:
     meta: 5
     xp: 60
     icone: pocao_cura
+
+  - id: buscador
+    nome: Pega, garoto!
+    descricao: Ele trouxe a bolinha 10 vezes.
+    contador: bolinha
+    meta: 10
+    xp: 30
+    icone: bola
+
+  - id: detetive
+    nome: Detetive
+    descricao: Ache ele 3 vezes no esconde-esconde.
+    contador: esconde
+    meta: 3
+    xp: 40
+    icone: olho
+
+  - id: alpinista
+    nome: Alpinista de janela
+    descricao: Ele subiu em janelas 10 vezes.
+    contador: janelas
+    meta: 10
+    xp: 30
+    icone: pular

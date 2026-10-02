@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QProxyStyle, QStyle
 
-from .. import cosmetics
+from .. import cosmetics, tricks
 from ..art import icons, sprite
 from ..art.sprite import Pose
 from ..needs import EFFECT_LABELS, LABELS
@@ -139,6 +139,7 @@ def fill_main(app, menu: QMenu, tray: bool = False) -> None:
     act.setEnabled(pet.can_interact())
     act.triggered.connect(app.pet_hug)
     _fill_wardrobe(app, menu.addMenu(_hat_icon("cartola"), "Guarda-roupa"))
+    _fill_play(app, menu.addMenu(_icon("bola"), "Brincadeiras"))
 
     menu.addSeparator()
     if app.in_tray:
@@ -227,6 +228,26 @@ def _fill_wardrobe(app, menu: QMenu) -> None:
     act.toggled.connect(lambda on: app.set_outfit("carregado", on))
 
 
+def _fill_play(app, menu: QMenu) -> None:
+    """Brincadeiras com você; as que ele ainda não aprendeu aparecem como ???."""
+    menu.setToolTipsVisible(True)
+    entries = (
+        ("chamar", "correr", "Vem cá!", "Ele corre até o mouse. Atalho: clique do meio no ícone da bandeja.",
+         app.call_pet),
+        ("bolinha", "bola", "Guardar a bolinha" if app.ball.active else "Jogar a bolinha",
+         "Arraste a bolinha e solte com força: ele busca e traz de volta.", app.toggle_ball),
+        ("esconde", "olho", "Esconde-esconde", "Ele se esconde; clique nele quando achar (você tem 90 s).",
+         app.start_hide),
+    )
+    for trick, icon, label, tip, slot in entries:
+        known = app.progress.knows(trick)
+        act = menu.addAction(_icon(icon) if known else QIcon(),
+                             label if known else f"??? (nível {tricks.TRICKS[trick]['nivel']})")
+        act.setToolTip(tip if known else "Ainda não aprendeu")
+        act.setEnabled(known)
+        act.triggered.connect(slot)
+
+
 def _fill_achievements(app, menu: QMenu) -> None:
     menu.setToolTipsVisible(True)
     done = app.progress.done
@@ -263,6 +284,12 @@ def _fill_settings(app, menu: QMenu) -> None:
     snd.addSeparator()
     _radio(snd, VOLUMES, s.sound_volume, lambda v: app.set_setting("sound_volume", v))
 
+    for trick, key, label in (("sozinho", "solo_play", "Brincar sozinho quando está feliz"),
+                              ("janelas", "climb", "Subir nas janelas abertas")):
+        if app.progress.knows(trick):
+            _check(menu, label, getattr(s, key), lambda v, k=key: app.set_setting(k, v))
+        else:
+            menu.addAction(f"??? (nível {tricks.TRICKS[trick]['nivel']})").setEnabled(False)
     _check(menu, "Esconder quando algo estiver em tela cheia", s.hide_fullscreen,
            lambda v: app.set_setting("hide_fullscreen", v))
     _check(menu, "Avisos quando estiver na bandeja", s.notifications,

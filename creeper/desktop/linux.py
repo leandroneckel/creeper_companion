@@ -97,3 +97,52 @@ def set_autostart(enabled: bool) -> None:
         "X-GNOME-Autostart-enabled=true\n",
         encoding="utf-8",
     )
+
+
+_hidden_cache: dict[str, tuple[float, bool]] = {}
+
+
+def _minimized(win: str) -> bool:
+    """_NET_WM_STATE_HIDDEN, guardado por 10 s pra não chamar o xprop toda hora."""
+    import time
+    now = time.monotonic()
+    cached = _hidden_cache.get(win)
+    if cached and now - cached[0] < 10:
+        return cached[1]
+    state = _run("xprop", "-id", win, "_NET_WM_STATE") or ""
+    hidden = "_NET_WM_STATE_HIDDEN" in state
+    _hidden_cache[win] = (now, hidden)
+    return hidden
+
+
+def window_rects() -> list[tuple[int, int, int, int]]:
+    """Janelas visíveis na área de trabalho atual, da de cima pra de baixo (só X11, via wmctrl).
+
+    No Wayland as janelas nativas não aparecem pro XWayland: aí devolve só as que der (ou nada).
+    """
+    if not _is_x11() or not shutil.which("wmctrl"):
+        return []
+    listing = _run("wmctrl", "-lG")
+    stacking = _run("xprop", "-root", "_NET_CLIENT_LIST_STACKING")
+    current = _run("xprop", "-root", "_NET_CURRENT_DESKTOP")
+    if not listing:
+        return []
+    try:
+        desk = current.split("=")[-1].strip() if current else None
+        rects = {}
+        for line in listing.splitlines():
+            parts = line.split(None, 7)
+            if len(parts) < 7:
+                continue
+            win, d, x, y, w, h = parts[0], parts[1], *map(int, parts[2:6])
+            if desk is not None and d not in (desk, "-1"):
+                continue
+            if w >= 80 and h >= 40:
+                rects[int(win, 16)] = (win, (x, y, x + w, y + h))
+        order = []
+        if stacking and "#" in stacking:   # lista de baixo pra cima
+            order = [int(v.strip(), 16) for v in stacking.split("#", 1)[1].split(",") if v.strip()]
+        ids = [i for i in reversed(order) if i in rects] or list(rects)
+        return [rects[i][1] for i in ids[:30] if not _minimized(rects[i][0])]
+    except (ValueError, IndexError):
+        return []
