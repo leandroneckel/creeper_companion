@@ -324,8 +324,47 @@ check(any(k.startswith("big:porco") for k in seen_props["porco"]) and "cavaleiro
       "porco aparece e dá conquista")
 check("estouro" in sounds and "foguete" in sounds, "fogos sobem e estouram")
 
+# ---- guarda-roupa ---------------------------------------------------------------
+from creeper import cosmetics  # noqa: E402
+
+pet.set_state("idle", dur=999)
+prog.level, prog.xp, said0 = 4, 0.0, len(said)
+prog.add_xp(prog.needed + 1)
+run(0.3)
+check(app.settings.hat == "abobora" and any(k == "reaction" and "5" in t for k, t in said[said0:]),
+      "nível 5 desbloqueia e já veste a abóbora")
+main_menu = QMenu()
+menus.fill_main(app, main_menu)
+wardrobe = next(a.menu() for a in main_menu.actions() if a.text() == "Guarda-roupa")
+hats_menu = next(a.menu() for a in wardrobe.actions() if a.text() == "Chapéu")
+hat_texts = {a.text(): a.isEnabled() for a in hats_menu.actions()}
+check(hat_texts.get("Abóbora esculpida") is True and hat_texts.get("??? (nível 12)") is False,
+      "guarda-roupa mostra o que tem e o que falta")
+
+prog.level = 30
+looks = [("abobora", "neve", "folhas"), ("cartola", "outono", "faiscas"), ("coroa", "noturno", "coracoes"),
+         ("capacete", "", "")]
+for hat, skin, trail in looks:
+    app.set_outfit("chapeu", hat)
+    app.set_outfit("cor", skin)
+    app.set_outfit("rastro", trail)
+    pet.set_state("walk", target=pet.x + (150 if pet.x < pet.world[2] / 2 else -150))
+    run(1.0)
+    check(pet.pose().skin == (skin or None) and app.settings.hat == hat, f"veste {hat}/{skin or 'verde'}")
+    if trail:
+        check(any(p.kind in ("crumb", "spark", "heart") for p in pet.particles), f"rastro de {trail} ao andar")
+    shot(f"visual_{hat}", hover=False)
+pet.set_state("idle", dur=999)
+app.set_outfit("carregado", True)
+run(0.1)
+check(app.settings.charged and any(p.kind == "bolt" for p in pet.particles) and "trovao" in sounds,
+      "creeper carregado chega com raio e trovão")
+shot("carregado_raio", hover=False)
+run(1)
+shot("carregado", hover=False)
+
 for name in ("pop", "mastigar", "gole", "brilho", "pulo", "miau", "cutucao", "chiado", "explosao", "pouso",
-             "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe"):
+             "carinho", "tonto", "xp", "nivel", "conquista", "picareta", "quebra", "oinc", "encolhe", "trovao"):
     check(name in sounds, f"som '{name}' tocou")
 check(any(n.startswith("nota_") for n in sounds), "dançar toca notas")
 

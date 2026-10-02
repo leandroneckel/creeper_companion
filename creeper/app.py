@@ -219,6 +219,11 @@ class CompanionApp(QObject):
     def open_present(self) -> None:
         self.pet.open_present()
 
+    def set_outfit(self, kind: str, value) -> None:
+        """Guarda-roupa: kind = "chapeu" | "cor" | "rastro" | "carregado"."""
+        self.pet.wear(kind, value)
+        self.save()
+
     # ---- conquistas ------------------------------------------------------
     def on_achievement(self, achievement: dict) -> None:
         self._achievement_queue.append(achievement)

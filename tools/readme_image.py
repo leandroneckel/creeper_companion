@@ -83,6 +83,7 @@ reset(fome=55, sede=70, energia=85, sono=62, diversao=92)
 app.progress.level = 7
 app.progress.xp = app.progress.needed * 0.6
 app.progress.presents = 1
+app.settings.hat = "abobora"   # chapéu do nível 5
 pet.cursor = (pet.x + 300, pet.y - 600)
 run(0.3)
 scenes.append(grab("Oi! Eu sou o Creepinho. Passa o mouse em mim pra ver do que eu preciso.", hover=True))

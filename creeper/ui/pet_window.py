@@ -3,10 +3,10 @@ painel de status e interação com o mouse."""
 import time
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QRegion
+from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen, QRegion
 from PySide6.QtWidgets import QToolTip, QWidget
 
-from .. import desktop
+from .. import cosmetics, desktop
 from ..art import icons, sprite
 from ..needs import EFFECT_LABELS, LABELS, STATS
 
@@ -194,7 +194,8 @@ class PetWindow(QWidget):
         return (pet.pose(), pet.hidden, pet.held, round(pet.tilt), round(r.x()), round(r.y()),
                 round(r.width()), round(r.height()), self.bubble_text, self.toolbar_visible(),
                 self.hover_btn, pet.state == "sleep", status, prog.presents, self.sticky is None,
-                pet.ghost, pet.tool, round(pet.tool_angle))
+                pet.ghost, pet.tool, round(pet.tool_angle), self.app.settings.hat,
+                int(pet.clock * 8) % 6 if self.app.settings.charged else 0)
 
     def show_bubble(self, text: str, seconds: float | None = None, action: str | None = None) -> None:
         """Mostra uma fala. Com `action` ("agua"/"pausa"), o balão ganha o botão "Fiz!" e volta
@@ -220,7 +221,12 @@ class PetWindow(QWidget):
 
     # ---- máscara de entrada (Linux/X11) ----------------------------------
     def _update_mask(self) -> None:
-        rects = [self.sprite_rect().toRect().adjusted(-2, -2, 2, 2)]
+        body = self.sprite_rect()
+        grow = 10 if self.app.settings.charged else 2   # a aura passa um pouco do corpo
+        rects = [body.toRect().adjusted(-grow, -grow, grow, grow)]
+        hat = self._hat_rect(body, self.pet.pose())
+        if hat:
+            rects.append(hat.toRect().adjusted(-2, -2, 2, 2))
         if self.toolbar_visible():
             rects.append(self.toolbar_rect())
             if self.status_visible():
@@ -236,7 +242,7 @@ class PetWindow(QWidget):
             rects.append(self._tool_rect().toRect().adjusted(-8, -8, 8, 8))
         for part in self.pet.particles:
             # a máscara também recorta o desenho no X11, então inclui cada partícula
-            if part.kind == "boom":
+            if part.kind in ("boom", "bolt"):
                 rects.append(QRect(0, 0, WIDTH, self.H))
                 continue
             size = 48 if part.kind in ("smoke", "z", "note", "icon") else 12
@@ -286,8 +292,10 @@ class PetWindow(QWidget):
 
     def _draw_creeper(self, p: QPainter) -> None:
         pet = self.pet
-        img = sprite.render(pet.pose())
+        pose = pet.pose()
+        img = sprite.render(pose)
         rect = self.sprite_rect()
+        outfit = self.app.settings
         p.save()
         if pet.ghost:
             p.setOpacity(0.28)
@@ -297,6 +305,17 @@ class PetWindow(QWidget):
             p.rotate(pet.tilt)
             p.translate(-pivot)
         p.drawImage(rect, img)
+        px_w, px_h = rect.width() / sprite.W, rect.height() / sprite.H   # tamanho de um pixel fino
+        if outfit.charged:
+            pad = sprite.AURA_PAD
+            p.save()
+            p.setOpacity(p.opacity() * 0.7)
+            p.drawImage(rect.adjusted(-pad * px_w, -pad * px_h, pad * px_w, pad * px_h),
+                        sprite.charged_aura(pose, int(pet.clock * 8) % 6))
+            p.restore()
+        hat_rect = self._hat_rect(rect, pose)
+        if hat_rect:
+            p.drawImage(hat_rect, icons.hat_image(outfit.hat))
         if pet.held:
             size = 8 * pet.s
             ix = rect.center().x() - size * 0.15
@@ -318,6 +337,16 @@ class PetWindow(QWidget):
                         icons.image(pet.tool))
             p.restore()
         p.restore()
+
+    def _hat_rect(self, rect: QRectF, pose) -> QRectF | None:
+        """Onde o chapéu fica: em cima da cabeça, descendo junto quando ele respira ou senta."""
+        hat = cosmetics.HATS.get(self.app.settings.hat)
+        if not hat:
+            return None
+        img = icons.hat_image(self.app.settings.hat)
+        px_w, px_h = rect.width() / sprite.W, rect.height() / sprite.H
+        top = rect.top() + (sprite.head_down(pose) - (img.height() - hat["sobre"])) * px_h
+        return QRectF(rect.left() + hat["x"] * px_w, top, img.width() * px_w, img.height() * px_h)
 
     def _tool_rect(self) -> QRectF:
         pet = self.pet
@@ -415,8 +444,15 @@ class PetWindow(QWidget):
                 p.setPen(color)
                 p.drawText(QPointF(x, y), part.text)
                 p.setPen(Qt.NoPen)
+            elif part.kind == "bolt":
+                pts = [QPointF(cx + px_, gy + py_) for px_, py_ in part.points]
+                glow = QColor(79, 195, 247, int(200 * fade))
+                for width, color in ((7, glow), (3, QColor(255, 255, 255, int(255 * fade)))):
+                    p.setPen(QPen(color, width))
+                    p.drawPolyline(pts)
+                p.setPen(Qt.NoPen)
             elif part.kind == "heart":
-                size = 6 * pet.s
+                size = part.size * 2
                 p.setOpacity(max(0.0, min(1.0, fade * 1.5)))
                 p.drawImage(QRectF(x - size / 2, y - size / 2, size, size), icons.image("carinho"))
                 p.setOpacity(1.0)

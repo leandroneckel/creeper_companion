@@ -11,6 +11,8 @@ from functools import lru_cache
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter
 
+from .. import cosmetics
+
 W, H = 16, 40
 HEAD_H = 16
 
@@ -28,10 +30,19 @@ SEAM = QColor(0, 0, 0, 70)
 SEAM_DARK = QColor(0, 0, 0, 120)
 
 
-def _texture(rng: random.Random, w: int, h: int) -> list[list[QColor]]:
-    colors = [QColor(c) for c, _ in _GREENS]
+def _texture(rng: random.Random, w: int, h: int) -> list[list[int]]:
+    """Textura em índices de tom (0 = mais escuro); a cor vem da paleta da roupa na hora de desenhar."""
     weights = [wt for _, wt in _GREENS]
-    return [[rng.choices(colors, weights)[0] for _ in range(w)] for _ in range(h)]
+    return [[rng.choices(range(len(_GREENS)), weights)[0] for _ in range(w)] for _ in range(h)]
+
+
+@lru_cache(maxsize=None)
+def _palette(skin: str | None) -> tuple[list[QColor], QColor]:
+    """Tons do corpo e cor do rosto para uma cor do guarda-roupa (None = verde clássico)."""
+    data = cosmetics.SKINS.get(skin) if skin else None
+    if not data:
+        return [QColor(c) for c, _ in _GREENS], FACE
+    return [QColor(c) for c in data["tons"]], QColor(data.get("rosto", FACE.name()))
 
 
 _rng = random.Random(1337)
@@ -56,6 +67,7 @@ class Pose:
     singed: bool = False
     tint: str | None = None  # "gold" | "sick"
     flash: float = 0.0       # 0..1, piscar branco antes de explodir
+    skin: str | None = None  # cor do guarda-roupa (cosmetics.SKINS)
 
 
 def _px(p: QPainter, pts, color: QColor, ox: int, oy: int) -> None:
@@ -63,63 +75,68 @@ def _px(p: QPainter, pts, color: QColor, ox: int, oy: int) -> None:
         p.fillRect(ox + x, oy + y, 1, 1, color)
 
 
-def _eye(p: QPainter, x: int, y: int, kind: str, side: int) -> None:
+def _eye(p: QPainter, x: int, y: int, kind: str, side: int, face: QColor = FACE) -> None:
     """Desenha um olho na caixa 4x4 em (x, y). side: -1 esquerdo, +1 direito."""
     full = [(i, j) for j in range(4) for i in range(4)]
     if kind == "closed":
-        p.fillRect(x, y + 2, 4, 1, FACE)
+        p.fillRect(x, y + 2, 4, 1, face)
     elif kind == "half":
-        p.fillRect(x, y + 2, 4, 2, FACE)
+        p.fillRect(x, y + 2, 4, 2, face)
     elif kind == "happy":
-        _px(p, [(1, 1), (2, 1), (0, 2), (3, 2), (0, 3), (3, 3)], FACE, x, y)
+        _px(p, [(1, 1), (2, 1), (0, 2), (3, 2), (0, 3), (3, 3)], face, x, y)
     elif kind == "angry":
         cut = {(2, 0), (3, 0), (3, 1)} if side < 0 else {(0, 0), (1, 0), (0, 1)}
-        _px(p, [c for c in full if c not in cut], FACE, x, y)
+        _px(p, [c for c in full if c not in cut], face, x, y)
     elif kind == "sad":
         cut = {(0, 0), (1, 0), (0, 1)} if side < 0 else {(2, 0), (3, 0), (3, 1)}
-        _px(p, [c for c in full if c not in cut], FACE, x, y)
+        _px(p, [c for c in full if c not in cut], face, x, y)
     elif kind == "x":
-        _px(p, [(0, 0), (3, 0), (1, 1), (2, 1), (1, 2), (2, 2), (0, 3), (3, 3)], FACE, x, y)
+        _px(p, [(0, 0), (3, 0), (1, 1), (2, 1), (1, 2), (2, 2), (0, 3), (3, 3)], face, x, y)
     elif kind == "squint":
         if side < 0:
             pts = [(0, 1), (1, 1), (2, 2), (3, 2), (0, 3), (1, 3)]
         else:
             pts = [(2, 1), (3, 1), (0, 2), (1, 2), (2, 3), (3, 3)]
-        _px(p, pts, FACE, x, y)
+        _px(p, pts, face, x, y)
     else:
-        p.fillRect(x, y, 4, 4, FACE)
+        p.fillRect(x, y, 4, 4, face)
         if kind == "glint":
             p.fillRect(x + 1, y + 1, 1, 1, GLINT)
         elif kind == "wide":
             p.fillRect(x + 1, y + 1, 2, 2, GLINT)
 
 
-def _mouth(p: QPainter, kind: str, oy: int) -> None:
+def _mouth(p: QPainter, kind: str, oy: int, face: QColor = FACE) -> None:
     if kind == "o":
-        p.fillRect(6, oy + 7, 4, 4, FACE)
+        p.fillRect(6, oy + 7, 4, 4, face)
         return
-    p.fillRect(6, oy + 6, 4, 2, FACE)  # "nariz"
+    p.fillRect(6, oy + 6, 4, 2, face)  # "nariz"
     if kind == "classic":
-        p.fillRect(4, oy + 8, 8, 4, FACE)
-        p.fillRect(4, oy + 12, 2, 2, FACE)
-        p.fillRect(10, oy + 12, 2, 2, FACE)
+        p.fillRect(4, oy + 8, 8, 4, face)
+        p.fillRect(4, oy + 12, 2, 2, face)
+        p.fillRect(10, oy + 12, 2, 2, face)
     elif kind in ("open", "hiss"):
-        p.fillRect(4, oy + 8, 8, 6, FACE)
+        p.fillRect(4, oy + 8, 8, 6, face)
         if kind == "open":
             p.fillRect(6, oy + 11, 4, 2, TONGUE)
         else:
             p.fillRect(5, oy + 10, 6, 2, FACE_SOFT)
     elif kind == "chew":
-        p.fillRect(4, oy + 8, 8, 3, FACE)
-        p.fillRect(4, oy + 11, 2, 1, FACE)
-        p.fillRect(10, oy + 11, 2, 1, FACE)
+        p.fillRect(4, oy + 8, 8, 3, face)
+        p.fillRect(4, oy + 11, 2, 1, face)
+        p.fillRect(10, oy + 11, 2, 1, face)
     elif kind == "wavy":
-        _px(p, [(5, 9), (6, 9), (9, 9), (10, 9), (4, 10), (7, 10), (8, 10), (11, 10)], FACE, 0, oy)
+        _px(p, [(5, 9), (6, 9), (9, 9), (10, 9), (4, 10), (7, 10), (8, 10), (11, 10)], face, 0, oy)
     elif kind == "smile":
-        p.fillRect(6, oy + 8, 4, 2, FACE)
-        p.fillRect(4, oy + 9, 2, 2, FACE)
-        p.fillRect(10, oy + 9, 2, 2, FACE)
-        p.fillRect(4, oy + 11, 8, 2, FACE)
+        p.fillRect(6, oy + 8, 4, 2, face)
+        p.fillRect(4, oy + 9, 2, 2, face)
+        p.fillRect(10, oy + 9, 2, 2, face)
+        p.fillRect(4, oy + 11, 8, 2, face)
+
+
+def head_down(pose: Pose) -> int:
+    """Quantos pixels finos a cabeça desce (respiração, sentar). O chapéu acompanha."""
+    return max(0, min(7, pose.bob + pose.sit))
 
 
 @lru_cache(maxsize=512)
@@ -128,24 +145,25 @@ def render(pose: Pose) -> QImage:
     img.fill(Qt.transparent)
     p = QPainter(img)
 
-    down = max(0, min(7, pose.bob + pose.sit))
+    down = head_down(pose)
+    tones, face = _palette(pose.skin)
 
     # cabeça
     for ty, row in enumerate(HEAD_TEX):
-        for tx, color in enumerate(row):
-            p.fillRect(tx * 2, down + ty * 2, 2, 2, color)
+        for tx, tone in enumerate(row):
+            p.fillRect(tx * 2, down + ty * 2, 2, 2, tones[tone])
     # corpo
     for ty, row in enumerate(BODY_TEX):
-        for tx, color in enumerate(row):
-            p.fillRect(tx * 2, HEAD_H + down + ty * 2, 2, 2, color)
+        for tx, tone in enumerate(row):
+            p.fillRect(tx * 2, HEAD_H + down + ty * 2, 2, 2, tones[tone])
     # pernas (o topo fica preso no corpo, os pés sobem)
     legs_top = 2 * HEAD_H + down
     for side, lift in ((0, pose.lift_l), (1, pose.lift_r)):
         height = max(1, H - legs_top - lift)
         for r in range(height):
             for c in range(8):
-                color = LEG_TEX[min(3, r // 2)][side * 4 + c // 2]
-                p.fillRect(side * 8 + c, legs_top + r, 1, 1, color)
+                tone = LEG_TEX[min(3, r // 2)][side * 4 + c // 2]
+                p.fillRect(side * 8 + c, legs_top + r, 1, 1, tones[tone])
     p.fillRect(7, legs_top, 2, H - legs_top, SEAM_DARK)
     # sombrinhas: cabeça sobre o corpo, corpo sobre as pernas
     p.fillRect(0, HEAD_H + down, 16, 1, SEAM)
@@ -166,9 +184,9 @@ def render(pose: Pose) -> QImage:
     # rosto
     lx = max(-1, min(1, pose.look_x))
     ly = max(-1, min(1, pose.look_y))
-    _eye(p, 2 + lx, down + 2 + ly, pose.eyes, -1)
-    _eye(p, 10 + lx, down + 2 + ly, pose.eyes, 1)
-    _mouth(p, pose.mouth, down)
+    _eye(p, 2 + lx, down + 2 + ly, pose.eyes, -1, face)
+    _eye(p, 10 + lx, down + 2 + ly, pose.eyes, 1, face)
+    _mouth(p, pose.mouth, down, face)
     if pose.blush:
         p.fillRect(0, down + 8, 2, 1, BLUSH)
         p.fillRect(14, down + 8, 2, 1, BLUSH)
@@ -184,4 +202,40 @@ def render(pose: Pose) -> QImage:
 
 def render_head(pose: Pose) -> QImage:
     """Só a cabeça (16x16), usada no ícone da bandeja."""
-    return render(Pose(eyes=pose.eyes, mouth=pose.mouth, blush=pose.blush, tint=pose.tint)).copy(0, 0, W, HEAD_H)
+    return render(Pose(eyes=pose.eyes, mouth=pose.mouth, blush=pose.blush, tint=pose.tint,
+                       skin=pose.skin)).copy(0, 0, W, HEAD_H)
+
+
+AURA_PAD = 2   # quanto a aura passa do corpo, em pixels finos
+
+
+@lru_cache(maxsize=128)
+def charged_aura(pose: Pose, phase: int) -> QImage:
+    """Aura do creeper carregado: listras azuis andando na diagonal, um pouco maior que o corpo.
+
+    phase (0..5) faz as listras andarem; o desenho fica em cache.
+    """
+    pad = AURA_PAD
+    size = (W + 2 * pad, H + 2 * pad)
+    silhouette = QImage(*size, QImage.Format_ARGB32_Premultiplied)
+    silhouette.fill(Qt.transparent)
+    p = QPainter(silhouette)
+    body = render(Pose(bob=pose.bob, sit=pose.sit, lift_l=pose.lift_l, lift_r=pose.lift_r))
+    for dx in range(2 * pad + 1):          # o corpo "engordado" em todas as direções
+        for dy in range(2 * pad + 1):
+            p.drawImage(dx, dy, body)
+    p.end()
+
+    aura = QImage(*size, QImage.Format_ARGB32_Premultiplied)
+    aura.fill(Qt.transparent)
+    p = QPainter(aura)
+    light, mid = QColor(170, 235, 255, 235), QColor(79, 195, 247, 170)
+    for y in range(size[1]):
+        for x in range(size[0]):
+            band = (x - y + phase) % 6
+            if band < 2:
+                p.fillRect(x, y, 1, 1, light if band == 0 else mid)
+    p.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+    p.drawImage(0, 0, silhouette)
+    p.end()
+    return aura

@@ -490,6 +490,24 @@ def slide(rng, f_from: float, f_to: float) -> list:
     return mul(s, ar_env(dur, 0.02, 0.15))
 
 
+def thunder(rng) -> list:
+    """Trovão: estalo seco do raio e um ronco que vai sumindo."""
+    dur = 2.2
+    brown, b = [], 0.0
+    for v in noise(dur, rng):
+        b = b * 0.99 + v * 0.12
+        brown.append(b)
+    rumble = svf(brown, 260, 0.8, "low")
+    peak = max(abs(v) for v in rumble) or 1.0
+    wobble = osc(dur, 3.3)   # o ronco "rola"
+    env = decay_env(dur, 0.08, 0.7)
+    out = [r / peak * e * (0.75 + 0.25 * w) for r, e, w in zip(rumble, env, wobble)]
+    crack = mul(svf(noise(0.18, rng), 2500, 0.6, "high"), decay_env(0.18, 0.001, 0.035))
+    add_at(out, crack, 0.0, 1.2)
+    top = max(abs(v) for v in out)
+    return fade([math.tanh(1.5 * v / top) for v in out], 0.001, 0.15)
+
+
 def dig(rng) -> list:
     """Cavar: baque abafado de terra."""
     dur = 0.16
@@ -537,6 +555,7 @@ SOUNDS = {
     "encolhe": (lambda rng: slide(rng, 900, 250), -19),
     "cresce": (lambda rng: slide(rng, 250, 900), -19),
     "cavar": (dig, -20),
+    "trovao": (thunder, -12),
 }
 
 

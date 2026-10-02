@@ -5,6 +5,8 @@ from functools import lru_cache
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter
 
+from .. import cosmetics
+
 _APPLE = [
     "......b.....",
     ".....bgg....",
@@ -660,6 +662,50 @@ ICONS: dict[str, tuple[list[str], dict[str, str]]] = {
     ], {"b": "#4E342E", "B": "#795548"}),
 }
 
+# Guarda-roupa: rastros e creeper carregado
+ICONS["folha"] = ([
+    "............",
+    "........gg..",
+    "......gGGg..",
+    ".....gGgGg..",
+    "....gGgGg...",
+    "...gGgGg....",
+    "..gGgGg.....",
+    "..gGGg......",
+    "..bgg.......",
+    ".b..........",
+    "b...........",
+    "............",
+], {"g": "#7CB342", "G": "#558B2F", "b": "#6D4C41"})
+ICONS["faisca"] = ([
+    "............",
+    ".....y......",
+    ".....y......",
+    "....yWy.....",
+    "..yyWWWyy...",
+    "....yWy.....",
+    ".....y......",
+    ".....y...y..",
+    "........yWy.",
+    ".y.......y..",
+    "yWy.........",
+    ".y..........",
+], {"y": "#FFD54F", "W": "#FFFDE7"})
+ICONS["raio"] = ([
+    ".......bbb..",
+    "......bbB...",
+    ".....bbB....",
+    "....bbB.....",
+    "...bbbbbbb..",
+    "......bbB...",
+    ".....bbB....",
+    "....bbB.....",
+    "...bB.......",
+    "..bB........",
+    ".b..........",
+    "............",
+], {"b": "#4FC3F7", "B": "#E1F5FE"})
+
 # Variações de desenhos que já existem
 ICONS["sopa_beterraba"] = (ICONS["ensopado"][0], {"s": "#B71C1C", "R": "#E57373", "b": "#8D6E63", "w": "#5D4037"})
 ICONS["cenoura_dourada"] = (ICONS["cenoura"][0], {"o": "#FFCA28", "O": "#C79100", "g": "#FFE082", "G": "#FFB300"})
@@ -812,6 +858,12 @@ def _build(grid: list[str], palette: dict[str, str], size: int | None = None, di
 def image(name: str) -> QImage:
     grid, palette = ICONS.get(name, ICONS["maca"])
     return _build(grid, palette, 12)
+
+
+@lru_cache(maxsize=None)
+def hat_image(hat_id: str) -> QImage:
+    hat = cosmetics.HATS[hat_id]
+    return _build(hat["grade"], hat["cores"])
 
 
 @lru_cache(maxsize=None)

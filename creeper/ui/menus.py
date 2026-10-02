@@ -1,8 +1,11 @@
 """Menus (clique direito, botões da barra e bandeja), com cara de tooltip do Minecraft."""
-from PySide6.QtGui import QAction, QActionGroup, QIcon
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QProxyStyle, QStyle
 
-from ..art import icons
+from .. import cosmetics
+from ..art import icons, sprite
+from ..art.sprite import Pose
 from ..needs import EFFECT_LABELS, LABELS
 
 STYLE = """
@@ -135,6 +138,7 @@ def fill_main(app, menu: QMenu, tray: bool = False) -> None:
     act = menu.addAction(_icon("carinho"), "Fazer carinho")
     act.setEnabled(pet.can_interact())
     act.triggered.connect(app.pet_hug)
+    _fill_wardrobe(app, menu.addMenu(_hat_icon("cartola"), "Guarda-roupa"))
 
     menu.addSeparator()
     if app.in_tray:
@@ -167,6 +171,60 @@ def _check(menu: QMenu, label: str, checked: bool, on_toggle) -> None:
     act.setCheckable(True)
     act.setChecked(checked)
     act.toggled.connect(on_toggle)
+
+
+TRAIL_ICONS = {"folhas": "folha", "faiscas": "faisca", "coracoes": "carinho"}
+
+
+def _square_icon(img: QImage) -> QIcon:
+    """Ícone 24x24 a partir de um desenho de qualquer proporção, sem borrar."""
+    side = max(img.width(), img.height())
+    canvas = QImage(side, side, QImage.Format_ARGB32_Premultiplied)
+    canvas.fill(Qt.transparent)
+    p = QPainter(canvas)
+    p.drawImage((side - img.width()) // 2, (side - img.height()) // 2, img)
+    p.end()
+    return QIcon(QPixmap.fromImage(canvas.scaled(24, 24, Qt.KeepAspectRatio, Qt.FastTransformation)))
+
+
+def _hat_icon(hat_id: str) -> QIcon:
+    return _square_icon(icons.hat_image(hat_id))
+
+
+def _skin_icon(skin: str) -> QIcon:
+    return _square_icon(sprite.render_head(Pose(eyes="glint", skin=skin or None)))
+
+
+def _fill_wardrobe(app, menu: QMenu) -> None:
+    """Chapéu, cor e rastro (um de cada) e o creeper carregado. O que falta aparece como ???."""
+    s, prog = app.settings, app.progress
+    parts = (
+        ("Chapéu", "chapeu", s.hat, "Nenhum", cosmetics.HATS, _hat_icon),
+        ("Cor", "cor", s.skin, "Verde (clássico)", cosmetics.SKINS, _skin_icon),
+        ("Rastro", "rastro", s.trail, "Nenhum", cosmetics.TRAILS, lambda k: _icon(TRAIL_ICONS[k])),
+    )
+    for title, kind, current, none_label, options, make_icon in parts:
+        sub = menu.addMenu(title)
+        group = QActionGroup(sub)
+        group.setExclusive(True)
+        entries = [("", none_label, 1)] + [(key, v["nome"], v["nivel"]) for key, v in options.items()]
+        for key, name, level in entries:
+            unlocked = prog.level >= level
+            icon = make_icon(key) if unlocked and (key or kind == "cor") else QIcon()
+            act = sub.addAction(icon, name if unlocked else f"??? (nível {level})")
+            act.setCheckable(True)
+            act.setChecked(key == current)
+            act.setEnabled(unlocked)
+            act.triggered.connect(lambda _=False, k=kind, v=key: app.set_outfit(k, v))
+            group.addAction(act)
+    menu.addSeparator()
+    level = cosmetics.CHARGED["nivel"]
+    unlocked = prog.level >= level
+    act = menu.addAction(_icon("raio"), cosmetics.CHARGED["nome"] if unlocked else f"??? (nível {level})")
+    act.setCheckable(True)
+    act.setChecked(s.charged)
+    act.setEnabled(unlocked)
+    act.toggled.connect(lambda on: app.set_outfit("carregado", on))
 
 
 def _fill_achievements(app, menu: QMenu) -> None:

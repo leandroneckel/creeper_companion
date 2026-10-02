@@ -85,6 +85,17 @@ Subindo de nível você desbloqueia coisas novas (no menu, as trancadas aparecem
 | 24 | **Poção de cura**: tira o emburrado e os efeitos ruins |
 | 26 | **Fogos de artifício** |
 
+### Guarda-roupa
+
+Os níveis também liberam visuais, que ficam no menu **Guarda-roupa** (cada coisa nova já vem vestida):
+
+| Nível | Visual |
+|---|---|
+| 5, 12, 21, 28 | Chapéus: abóbora esculpida, cartola, coroa, capacete de diamante |
+| 8, 15, 23 | Cores: neve, outono, noturno (com o rosto brilhando) |
+| 10, 19, 27 | Rastros ao andar: folhas, faíscas, corações |
+| 30 | **Creeper carregado**: aura elétrica, chega com raio e trovão (e explode maior) |
+
 **Conquistas** (como "Tsss... BUM!" e "Uma semana juntos") aparecem num aviso no canto da tela e dão XP
 extra. A lista fica no menu, em **Conquistas**.
 
@@ -143,6 +154,7 @@ creeper/
   pet.py                comportamento: estados, reações, falas, partículas
   needs.py              necessidades, efeitos, humor
   progress.py           XP, níveis, estoque, presentes e conquistas
+  cosmetics.py          guarda-roupa: chapéus, cores, rastros, creeper carregado
   config.py             configurações e salvamento
   content.py            leitura dos YAML
   art/sprite.py         o creeper em pixel art (gerado por código) e suas expressões
@@ -173,7 +185,7 @@ e todos os sons são sintetizados por código; nenhuma textura ou som do jogo é
 
 ## Próximos passos
 
-- Mais coisas pra desbloquear com os níveis: guarda-roupa (chapéus, cores, rastros, creeper carregado)
-  e comportamentos (vir quando chamado, brincar sozinho, subir nas janelas, brincadeiras com você).
+- Comportamentos pra desbloquear: vir quando chamado, brincar sozinho, subir nas janelas e
+  brincadeiras com você.
 - Executável único (`.exe` no Windows, AppImage no Linux).
 - Conversa de verdade com ele via API do Claude (opcional, pago por uso).

@@ -440,3 +440,9 @@ fim_encolhido:
   - "Voltei ao tamanho normal! Senti falta da vista daqui de cima."
 fim_invisivel:
   - "Tô visível de novo! Sentiu minha falta?"
+
+# ---- guarda-roupa ----
+desbloqueou_visual:
+  - "Nível {nivel}! Ganhei {itens} pro guarda-roupa. Já tô usando!"
+  - "Nível {nivel}! Olha meu visual novo: {itens}. Dá pra trocar no Guarda-roupa."
+  - "Nível {nivel}! {itens}! Tô me sentindo o creeper mais estiloso do servidor."

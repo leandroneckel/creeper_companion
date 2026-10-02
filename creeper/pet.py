@@ -10,6 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 
+from . import cosmetics
 from .art.sprite import Pose
 from .needs import Needs
 from .progress import Progress
@@ -79,6 +80,7 @@ class Particle:
     color: str = "#FFFFFF"
     size: float = 3.0
     text: str = ""
+    points: tuple = ()     # raio: a linha em zigue-zague
 
 
 class Pet:
@@ -121,6 +123,8 @@ class Pet:
         self.size = 1.0                # encolhe com a poção
         self.size_target = 1.0
         self.hop: float | None = None  # tempo desde o início do pulo da poção de salto
+        self._last_x = self.x
+        self._trail_timer = 0.0
 
         now = time.monotonic()
         self.last_chat = now
@@ -242,6 +246,7 @@ class Pet:
 
         getattr(self, f"_u_{self.state}")(dt)
         self._hop_tick(dt)
+        self._trail_tick(dt)
 
         for event in self.progress.drain():
             self._on_progress(event)
@@ -737,14 +742,16 @@ class Pet:
         self.flash = self.swell = 0.0
         self.hidden = True
         h = self.sprite_h
-        for _ in range(46):
+        charged = self.settings.charged   # creeper carregado explode maior, como no jogo
+        skin = cosmetics.SKINS.get(self.settings.skin)
+        colors = skin["tons"][:5] if skin else ("#1F6B1C", "#2F8A28", "#3FA535", "#55BC48", "#74D166")
+        for _ in range(70 if charged else 46):
             ang = random.uniform(0, math.tau)
-            spd = random.uniform(150, 520)
+            spd = random.uniform(150, 520) * (1.25 if charged else 1.0)
             self.particles.append(Particle(
                 "debris", x=random.uniform(-0.4, 0.4) * self.sprite_w, y=-random.uniform(0.1, 0.9) * h,
                 vx=math.cos(ang) * spd, vy=math.sin(ang) * spd - 220, gravity=1300,
-                life=random.uniform(1.2, 2.2), color=random.choice(("#3FA535", "#55BC48", "#2F8A28", "#74D166", "#1F6B1C")),
-                size=random.choice((1, 2, 2, 3)) * self.s))
+                life=random.uniform(1.2, 2.2), color=random.choice(colors), size=random.choice((1, 2, 2, 3)) * self.s))
         for _ in range(16):
             ang = random.uniform(0, math.tau)
             spd = random.uniform(20, 120)
@@ -752,7 +759,7 @@ class Pet:
                 "smoke", x=random.uniform(-0.5, 0.5) * self.sprite_w, y=-random.uniform(0.2, 0.8) * h,
                 vx=math.cos(ang) * spd, vy=math.sin(ang) * spd - 40, life=random.uniform(1.2, 2.0),
                 color=random.choice(("#EEEEEE", "#BDBDBD", "#9E9E9E")), size=random.uniform(8, 18) * self.s / 3))
-        self.particles.append(Particle("boom", x=0, y=-h / 2, life=0.35, size=h * 1.2))
+        self.particles.append(Particle("boom", x=0, y=-h / 2, life=0.35, size=h * (1.7 if charged else 1.2)))
         self.needs.annoyance = 0.0
         self.needs.sulk(10 * 60)
         self.needs.add_effect("chamuscado")
@@ -1029,8 +1036,14 @@ class Pet:
         kind = event[0]
         if kind == "level":
             _, level, unlocked = event
-            if unlocked:
-                self.line("desbloqueou", "reaction", nivel=level, itens=", ".join(i["nome"] for i in unlocked))
+            visual = [u for u in unlocked if u.get("tipo")]
+            for u in visual:
+                self.wear(u["tipo"], u["id"])   # coisa nova do guarda-roupa já vem vestida
+            names = ", ".join(i["nome"] for i in unlocked)
+            if visual and len(visual) == len(unlocked):
+                self.line("desbloqueou_visual", "reaction", nivel=level, itens=names)
+            elif unlocked:
+                self.line("desbloqueou", "reaction", nivel=level, itens=names)
             else:
                 self.line("subiu_nivel", "reaction", nivel=level)
             self.happy_until = self.clock + 3.0
@@ -1045,6 +1058,66 @@ class Pet:
                 self.sfx("pop")
         elif kind == "losing":
             self.line("perdendo_xp", "need")
+
+    # ---- guarda-roupa ----------------------------------------------------
+    def wear(self, kind: str, value) -> None:
+        """Veste algo: kind = "chapeu" | "cor" | "rastro" (id ou "") ou "carregado" (liga/desliga)."""
+        s = self.settings
+        if kind == "carregado":
+            s.charged = bool(value)
+            if s.charged:
+                self.strike()
+            return
+        setattr(s, {"chapeu": "hat", "cor": "skin", "rastro": "trail"}[kind], value or "")
+        if value:
+            self.sfx("pop")
+            self.happy_until = self.clock + 1.5
+
+    def strike(self) -> None:
+        """Raio! É assim que um creeper vira carregado."""
+        if self.hidden:
+            return
+        head = -self.sprite_h * 0.95 - self.jump
+        x, y, pts = random.uniform(-20, 20), head - 480, []
+        while y < head:
+            pts.append((x, y))
+            y += random.uniform(25, 45)
+            x = max(-110.0, min(110.0, x + random.uniform(-28, 28)))
+        pts.append((0.0, head))
+        self.particles.append(Particle("bolt", x=0, y=0, life=0.45, points=tuple(pts)))
+        self.sfx("trovao")
+        self.flinch_until = self.clock + 0.6
+        for _ in range(14):
+            ang = random.uniform(0, math.tau)
+            self.particles.append(Particle(
+                "spark", x=math.cos(ang) * self.sprite_w * 0.4, y=head + math.sin(ang) * 10,
+                vx=math.cos(ang) * 120, vy=math.sin(ang) * 120, life=0.5,
+                color=random.choice(("#4FC3F7", "#E1F5FE", "#FFFFFF")), size=self.s * 1.5))
+
+    def _trail_tick(self, dt: float) -> None:
+        """Rastro do guarda-roupa: sai de trás dele enquanto anda."""
+        moved = abs(self.x - self._last_x)
+        self._last_x = self.x
+        trail = self.settings.trail
+        if not trail or self.hidden or moved < 0.3 or self.state in ("dragged", "fall"):
+            return
+        self._trail_timer += dt
+        if self._trail_timer < 0.12:
+            return
+        self._trail_timer = 0.0
+        x = -self.facing * self.sprite_w * 0.45 + random.uniform(-4, 4)
+        y = -random.uniform(0.05, 0.6) * self.sprite_h - self.jump
+        if trail == "folhas":
+            self.particles.append(Particle(
+                "crumb", x=x, y=y, vx=-self.facing * random.uniform(10, 30), vy=-20, gravity=90, life=1.4,
+                color=random.choice(("#7CB342", "#558B2F", "#C0CA33", "#F9A825")), size=self.s * 1.5))
+        elif trail == "faiscas":
+            self.particles.append(Particle(
+                "spark", x=x, y=y, vx=-self.facing * 20, vy=random.uniform(-40, -10), life=0.5,
+                color=random.choice(("#FFD54F", "#FFF59D", "#FFFFFF")), size=self.s * 1.5))
+        elif trail == "coracoes":
+            self.particles.append(Particle("heart", x=x, y=y, vx=-self.facing * 10, vy=-30, life=1.1,
+                                           size=self.s * 1.5))
 
     def self_care(self, kind: str) -> None:
         """Você apertou "Fiz!" no lembrete de água ou de pausa."""
@@ -1251,7 +1324,8 @@ class Pet:
         return Pose(
             eyes=eyes, mouth=mouth, look_x=lx, look_y=ly, blush=blush, tear=tear,
             bob=bob, lift_l=lift_l, lift_r=lift_r, sit=sit, singed=n.has("chamuscado"),
-            tint=tint, flash=round(self.flash * 10) / 10 if st == "hiss" else 0.0)
+            tint=tint, flash=round(self.flash * 10) / 10 if st == "hiss" else 0.0,
+            skin=self.settings.skin or None)
 
     # ---- persistência ----------------------------------------------------
     def to_dict(self) -> dict:

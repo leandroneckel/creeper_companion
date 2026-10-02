@@ -7,6 +7,8 @@ import random
 import time
 from datetime import date, timedelta
 
+from . import cosmetics
+
 # Fontes de XP
 TIME_XP_PER_MIN = 1.0        # app aberto e você usando o PC
 WELL_XP_PER_MIN = 0.5        # bônus enquanto ele está bem cuidado
@@ -71,7 +73,7 @@ class Progress:
             self.xp -= self.needed
             self.level += 1
             self.presents += 1           # todo nível traz um presente
-            unlocked = [i for i in self.items.all() if i.get("nivel") == self.level]
+            unlocked = [i for i in self.items.all() + cosmetics.UNLOCKS if i.get("nivel") == self.level]
             self.events.append(("level", self.level, unlocked))
             self.record("nivel", self.level)
 

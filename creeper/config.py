@@ -45,6 +45,11 @@ class Settings:
     notifications: bool = True
     sound: bool = True
     sound_volume: int = 60         # 30 = baixo, 60 = médio, 100 = alto
+    # guarda-roupa (ids de cosmetics.py; "" = nada)
+    hat: str = ""
+    skin: str = ""
+    trail: str = ""
+    charged: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> "Settings":

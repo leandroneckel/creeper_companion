@@ -31,14 +31,15 @@ class Tray(QSystemTrayIcon):
     def refresh(self) -> None:
         pet = self.app.pet
         n = pet.needs
+        skin = self.app.settings.skin or None
         if pet.state == "sleep":
-            pose = Pose(eyes="closed")
+            pose = Pose(eyes="closed", skin=skin)
         elif n.mood() in ("irritado", "emburrado"):
-            pose = Pose(eyes="angry")
+            pose = Pose(eyes="angry", skin=skin)
         elif n.mood() in ("chateado", "péssimo"):
-            pose = Pose(eyes="sad")
+            pose = Pose(eyes="sad", skin=skin)
         else:
-            pose = Pose(eyes="glint")
+            pose = Pose(eyes="glint", skin=skin)
         if pose != self._icon_key:
             self._icon_key = pose
             img = sprite.render_head(pose).scaled(64, 64, Qt.IgnoreAspectRatio, Qt.FastTransformation)
