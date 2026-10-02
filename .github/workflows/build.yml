@@ -1,0 +1,46 @@
+# Gera o executável e o instalador numa máquina Windows do GitHub, a partir do código do repositório.
+# Só roda quando alguém manda: aba Actions → "Gerar executável e instalador" → Run workflow
+# (ou: gh workflow run build.yml). Não publica nada: os arquivos ficam como artefatos da execução.
+# Quando a SignPath aprovar o projeto, a assinatura entra aqui, antes de montar o instalador.
+name: Gerar executável e instalador
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025   # já vem com o Inno Setup 6
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Instalar dependências
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Gerar executável e instalador
+        run: python tools/build_exe.py
+
+      - name: Conferir os arquivos
+        shell: pwsh
+        run: |
+          foreach ($f in "dist/CreeperCompanion.exe", "dist/CreeperCompanion-Setup.exe") {
+            if (-not (Test-Path $f)) { Write-Error "Faltou $f"; exit 1 }
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            "{0}  {1:N1} MB  sha256 {2}" -f $f, ((Get-Item $f).Length / 1MB), $h
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: creeper-companion-${{ github.sha }}
+          path: |
+            dist/CreeperCompanion.exe
+            dist/CreeperCompanion-Setup.exe
+          if-no-files-found: error

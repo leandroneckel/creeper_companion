@@ -163,7 +163,9 @@ O script confere que o git está limpo e em dia, mostra as notas (por padrão, o
 atualização automática baixa). Na primeira vez ele também liga o GitHub Pages, que publica a página de download
 (`docs/index.html`) em https://leandroneckel.github.io/creeper_companion/.
 
-Pra só gerar os arquivos e testar: `python tools/build_exe.py` (saem em `dist/`).
+Pra só gerar os arquivos e testar: `python tools/build_exe.py` (saem em `dist/`). O mesmo build roda numa
+máquina Windows do GitHub pelo workflow `.github/workflows/build.yml`, só quando alguém manda (aba Actions →
+Run workflow, ou `gh workflow run build.yml`); ele não publica nada e é onde a assinatura pela SignPath vai entrar.
 
 **Assinatura digital (opcional):** com um certificado de assinatura de código instalado no Windows, defina
 `CREEPER_CERTIFICADO` com a impressão digital (thumbprint) dele antes de gerar, e o `.exe` e o instalador saem
