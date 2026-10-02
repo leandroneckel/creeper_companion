@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code signing policy · Creeper Companion</title>
+<meta name="description" content="Code signing policy and privacy policy of Creeper Companion.">
+<meta name="theme-color" content="#160A1C">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main class="doc">
+  <a class="voltar" href="./">← Creeper Companion</a>
+
+  <h1>Code signing policy</h1>
+  <p class="destaque-caixa">Free code signing provided by <a href="https://signpath.io">SignPath.io</a>,
+    certificate by <a href="https://signpath.org">SignPath Foundation</a>.</p>
+  <p><strong>Status:</strong> our application to the SignPath Foundation is under review. Releases up to and
+    including 1.0.0 are not signed. This page will say so when signed releases start.</p>
+
+  <h2>What is signed</h2>
+  <p>Only the Windows release files built from the source code in
+    <a href="https://github.com/leandroneckel/creeper_companion">this repository</a>:
+    <code>CreeperCompanion-Setup.exe</code> (installer) and <code>CreeperCompanion.exe</code> (application),
+    published on the <a href="https://github.com/leandroneckel/creeper_companion/releases">releases page</a>.
+    Signed releases are built automatically from a tagged commit on GitHub-hosted runners (GitHub Actions), and
+    every signing request is approved manually by an approver listed below.</p>
+
+  <h2>Team roles</h2>
+  <ul>
+    <li><strong>Committers and reviewers:</strong> <a href="https://github.com/leandroneckel">Leandro Neckel</a></li>
+    <li><strong>Approvers:</strong> <a href="https://github.com/leandroneckel">Leandro Neckel</a></li>
+  </ul>
+  <p>Contributions from other people are reviewed by a reviewer before they are merged.</p>
+
+  <h2 id="privacy">Privacy policy</h2>
+  <p>This program will not transfer any information to other networked systems unless specifically requested by
+    the user or the person installing or operating it.</p>
+  <ul>
+    <li>The only network access is the update check, and it is opt-in: the installer has a checkbox for it and,
+      without the installer, the program asks on first run. When enabled, it asks the GitHub Releases API for the
+      latest version every 6 hours, and downloads a new version from GitHub only when the user clicks "Update".
+      It can be turned off at any time in Settings. These requests go to GitHub and are covered by the
+      <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub
+      Privacy Statement</a>.</li>
+    <li>No telemetry, no analytics, no ads and no accounts.</li>
+    <li>The pet's progress and settings are stored only on the user's computer
+      (<code>%APPDATA%\CreeperCompanion</code> on Windows, <code>~/.config/creeper-companion</code> on Linux).
+      The uninstaller offers to delete them.</li>
+  </ul>
+
+  <hr>
+
+  <h1 lang="pt-BR">Política de assinatura de código</h1>
+  <div lang="pt-BR">
+    <p class="destaque-caixa">Assinatura de código gratuita fornecida por <a href="https://signpath.io">SignPath.io</a>,
+      certificado da <a href="https://signpath.org">SignPath Foundation</a>.</p>
+    <p><strong>Situação:</strong> nosso pedido à SignPath Foundation está em análise. As versões até a 1.0.0 não
+      são assinadas. Esta página vai avisar quando as versões assinadas começarem.</p>
+
+    <h2>O que é assinado</h2>
+    <p>Só os arquivos de Windows gerados a partir do código deste repositório: o instalador
+      (<code>CreeperCompanion-Setup.exe</code>) e o programa (<code>CreeperCompanion.exe</code>), publicados na
+      página de versões do GitHub. As versões assinadas são geradas automaticamente a partir de um commit marcado,
+      em máquinas do próprio GitHub (GitHub Actions), e cada pedido de assinatura é aprovado à mão por um
+      aprovador listado abaixo.</p>
+
+    <h2>Papéis</h2>
+    <ul>
+      <li><strong>Quem faz commit e revisa:</strong> Leandro Neckel</li>
+      <li><strong>Quem aprova:</strong> Leandro Neckel</li>
+    </ul>
+    <p>Contribuições de outras pessoas são revisadas antes de entrar no projeto.</p>
+
+    <h2 id="privacidade">Privacidade</h2>
+    <p>Este programa não envia nenhuma informação para outros sistemas na rede, a não ser que o usuário, ou quem
+      instala ou usa o programa, peça.</p>
+    <ul>
+      <li>O único acesso à internet é a procura de versão nova, e só se você deixar: o instalador tem uma opção pra
+        isso e, sem instalador, o creeper pergunta na primeira vez que abre. Ligada, ela pergunta ao GitHub qual é
+        a versão mais nova a cada 6 horas, e só baixa quando você clica em "Atualizar". Dá pra desligar a qualquer
+        hora em Configurações. Esses pedidos vão para o GitHub e seguem a
+        <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">declaração
+        de privacidade do GitHub</a>.</li>
+      <li>Sem telemetria, sem estatísticas de uso, sem propaganda e sem contas.</li>
+      <li>O progresso do creeper e as configurações ficam só no seu computador
+        (<code>%APPDATA%\CreeperCompanion</code> no Windows, <code>~/.config/creeper-companion</code> no Linux).
+        O desinstalador pergunta se você quer apagar.</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <p>Projeto de fã, sem fins comerciais. Não é oficial nem associado à Mojang Studios ou à Microsoft.</p>
+  <p><a href="./">Página inicial</a> · <a href="https://github.com/leandroneckel/creeper_companion">Código no GitHub</a></p>
+</footer>
+</body>
+</html>

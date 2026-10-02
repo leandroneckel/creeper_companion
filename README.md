@@ -238,7 +238,8 @@ docs/index.html         página de download (GitHub Pages)
 
 ## Licença
 
-Código sob a licença [MIT](LICENSE).
+Código sob a licença [MIT](LICENSE). Assinatura de código e privacidade:
+[Code signing policy](https://leandroneckel.github.io/creeper_companion/politica.html).
 
 ## Aviso
 

@@ -1,0 +1,108 @@
+/* Estilo das páginas do site (index.html e politica.html). */
+:root {
+  --fundo: #0F0714;
+  --painel: #1A0D22;
+  --borda: #4B2A86;
+  --texto: #F2F2F2;
+  --suave: #B9AEC2;
+  --destaque: #8BE04E;
+  --verde: #7FB04A;
+  --verde-claro: #B5E07A;
+  --verde-escuro: #3E6B1E;
+  --pixel: "Pixelify Sans", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--destaque); }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--verde-claro); outline-offset: 3px; }
+img.px { image-rendering: pixelated; }
+
+.hero {
+  text-align: center;
+  padding: 56px 16px 28px;
+  background: linear-gradient(#1B0E2B, var(--fundo));
+}
+.hero .cabeca { width: 96px; height: 96px; }
+h1, h2, .baixar, summary { font-family: var(--pixel); }
+h1 { font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1.1; margin: 16px 0 12px; font-weight: 700; }
+.tagline { max-width: 620px; margin: 0 auto 28px; color: var(--suave); font-size: 1.1rem; }
+
+.baixar {
+  display: inline-block;
+  padding: 14px 32px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  text-shadow: 2px 2px 0 #1E3A0C;
+  background: var(--verde);
+  border: 3px solid #0A0A0A;
+  box-shadow: inset 4px 4px 0 var(--verde-claro), inset -4px -4px 0 var(--verde-escuro);
+}
+.baixar:hover { background: #8CC255; }
+.baixar:active { box-shadow: inset 4px 4px 0 var(--verde-escuro), inset -4px -4px 0 var(--verde-claro); }
+.detalhes { margin: 14px 0 0; color: var(--suave); font-size: 0.95rem; }
+
+.cena { margin: 0; background: #6FAEE8; border-block: 3px solid var(--borda); }
+.cena img { display: block; width: 100%; max-width: 1270px; margin: 0 auto; height: auto; }
+
+main { max-width: 900px; margin: 0 auto; padding: 8px 16px 40px; }
+section { margin-top: 44px; }
+h2 { font-size: 1.9rem; margin: 0 0 16px; font-weight: 700; }
+
+.passos { list-style: none; counter-reset: passo; padding: 0; margin: 0; display: grid; gap: 12px; }
+.passos li {
+  counter-increment: passo;
+  position: relative;
+  padding: 14px 16px 14px 64px;
+  background: var(--painel);
+  border: 3px solid var(--borda);
+}
+.passos li::before {
+  content: counter(passo);
+  position: absolute; left: 14px; top: 12px;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  font-family: var(--pixel); font-weight: 700; font-size: 1.2rem;
+  color: #1E3A0C; background: var(--verde-claro);
+}
+.nota { color: var(--suave); font-size: 0.95rem; margin: 14px 0 0; }
+
+.cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.cartao { display: flex; gap: 14px; align-items: flex-start; padding: 16px; background: var(--painel); border: 3px solid var(--borda); }
+.cartao img { width: 48px; height: 48px; flex: none; }
+.cartao h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.cartao p { margin: 0; color: var(--suave); font-size: 0.95rem; }
+
+details { background: var(--painel); border: 3px solid var(--borda); margin-bottom: 10px; }
+summary { cursor: pointer; padding: 12px 16px; font-size: 1.15rem; font-weight: 500; }
+details p { margin: 0; padding: 0 16px 14px; color: var(--suave); }
+
+footer {
+  border-top: 3px solid var(--borda);
+  padding: 24px 16px 40px;
+  text-align: center;
+  color: var(--suave);
+  font-size: 0.85rem;
+}
+footer p { max-width: 720px; margin: 6px auto; }
+
+/* aviso da assinatura, embaixo do botão de baixar */
+.assinatura { margin: 6px 0 0; color: var(--suave); font-size: 0.85rem; }
+
+/* páginas de texto (politica.html) */
+.doc { max-width: 760px; }
+.doc .voltar { display: inline-block; margin: 28px 0 8px; font-size: 0.95rem; }
+.doc h1 { font-size: clamp(1.8rem, 6vw, 2.6rem); margin: 8px 0 16px; }
+.doc h2 { font-size: 1.4rem; margin: 32px 0 10px; }
+.doc p, .doc li { color: var(--suave); }
+.doc strong { color: var(--texto); }
+.doc .destaque-caixa { padding: 12px 16px; background: var(--painel); border: 3px solid var(--borda); color: var(--texto); }
+.doc hr { border: 0; border-top: 3px solid var(--borda); margin: 40px 0 0; }
+code { font-size: 0.9em; background: var(--painel); padding: 1px 5px; }
